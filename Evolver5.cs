@@ -1,3 +1,21 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Configuration;
+using System.Drawing.Drawing2D;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Reflection;
+using System.Runtime.Loader;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web.Http.Filters;
+using System.Xml.Linq;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,32 +31,16 @@ using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.FormInput;
 using Newtonsoft.Json.Linq;
 using Shared;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Configuration;
-using System.Drawing.Drawing2D;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
 using static System.Net.Mime.MediaTypeNames;
-using System.Reflection;
-using System.Runtime.Loader;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Web.Http.Filters;
-using System.Xml.Linq;
 
 
-public class BaseNode<T> where T : BaseNode<T>
+
+public class BaseNode<T>
+    where T : BaseNode<T>
 {
-
     public TreeNode<T> tree;
 }
+
 public class BlockNode : SemanticNode
 {
     public BlockNode(SyntaxElementNode b)
@@ -73,17 +75,15 @@ public class ClassNode : TypeDeclarationNode
     {
         get
         {
-                var ret=
-             tree.FindWhereStop(
-                        t => t.Value.Kind == SyntaxKind.StaticKeyword,
-                t => t.Value.Kind == SyntaxKind.OpenBraceToken
-            )
-            .Any();
-            
+            var ret = tree.FindWhereStop(
+                    t => t.Value.Kind == SyntaxKind.StaticKeyword,
+                    t => t.Value.Kind == SyntaxKind.OpenBraceToken
+                )
+                .Any();
+
             return ret;
         }
     }
-        
 
     protected override SyntaxKind? GetTypeSpecificKeyword() => SyntaxKind.ClassKeyword;
 }
@@ -213,6 +213,7 @@ public class CSharpierFormatter
     {
         Initialize();
     }
+
     private static void BecauseNewerRoslynBreaksCSharpier(string path)
     {
         var dll = Directory.Exists(path) ? Path.Combine(path, "CSharpier.Core.dll") : path;
@@ -233,9 +234,12 @@ public class CSharpierFormatter
             .First(m => m.Name == "Format" && m.GetParameters().Length == 2);
         return;
     }
+
     private static void Initialize()
     {
-        BecauseNewerRoslynBreaksCSharpier(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, csharpierPath));
+        BecauseNewerRoslynBreaksCSharpier(
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, csharpierPath)
+        );
     }
 
     private static AssemblyLoadContext context;
@@ -311,7 +315,10 @@ public class ExpressionBodyNode : SemanticNode
     public ExpressionBodyNode(SyntaxElementNode b)
         : base(b) { }
 }
-public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSyntaxKind(this AccessModifier modifier)
+
+public static class ExtensionsOfAccessModifier
+{
+    public static SyntaxKind ToSyntaxKind(this AccessModifier modifier)
     {
         return modifier switch
         {
@@ -322,7 +329,11 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
             _ => throw new NotImplementedException(),
         };
     }
-}public static class ExtensionsOfIEnumerableOfT{    public static IEnumerable<T> GroupByPredicates<T>(
+}
+
+public static class ExtensionsOfIEnumerableOfT
+{
+    public static IEnumerable<T> GroupByPredicates<T>(
         this IEnumerable<T> items,
         List<Func<T, object>> predicates
     )
@@ -365,11 +376,24 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
         return result;
     }
-}public static class ExtensionsOfIEnumerableOfTreeNodeOfSemanticNode{    public static IEnumerable<TreeNode<SemanticNode>> DeleteKind(this IEnumerable<TreeNode<SemanticNode>> en, SyntaxKind kind, DeleteType deleteType = DeleteType.SingleNode)
+}
+
+public static class ExtensionsOfIEnumerableOfTreeNodeOfSemanticNode
+{
+    public static IEnumerable<TreeNode<SemanticNode>> DeleteKind(
+        this IEnumerable<TreeNode<SemanticNode>> en,
+        SyntaxKind kind,
+        DeleteType deleteType = DeleteType.SingleNode
+    )
     {
         return en.DeleteKinds(new HashSet<SyntaxKind>() { kind }, deleteType);
     }
-    public static IEnumerable<TreeNode<SemanticNode>> DeleteKinds(this IEnumerable<TreeNode<SemanticNode>> en, HashSet<SyntaxKind> kinds, DeleteType deleteType = DeleteType.SingleNode)
+
+    public static IEnumerable<TreeNode<SemanticNode>> DeleteKinds(
+        this IEnumerable<TreeNode<SemanticNode>> en,
+        HashSet<SyntaxKind> kinds,
+        DeleteType deleteType = DeleteType.SingleNode
+    )
     {
         foreach (var x in en)
         {
@@ -380,37 +404,37 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
     public static List<TreeNode<SemanticNode>> NotPresentIn(
         this IEnumerable<TreeNode<SemanticNode>> candidates,
-        IEnumerable<TreeNode<SemanticNode>> existing)
+        IEnumerable<TreeNode<SemanticNode>> existing
+    )
     {
         var existingNames = existing.Select(e => e.Value.FullName).ToHashSet();
-        return candidates
-            .Where(c => !existingNames.Contains(c.Value.FullName))
-            .ToList();
+        return candidates.Where(c => !existingNames.Contains(c.Value.FullName)).ToList();
     }
 
     public static Dictionary<string, TreeNode<SemanticNode>> ToDictionaryByFullName(
-        this IEnumerable<TreeNode<SemanticNode>> nodes)
-        => nodes.ToDictionary(t => t.Value.FullName);
-}public static class ExtensionsOfIEnumerableOfTSource{    public static Dictionary<TKey, TSource> GroupBySingle<TSource, TKey>(
+        this IEnumerable<TreeNode<SemanticNode>> nodes
+    ) => nodes.ToDictionary(t => t.Value.FullName);
+}
+
+public static class ExtensionsOfIEnumerableOfTSource
+{
+    public static Dictionary<TKey, TSource> GroupBySingle<TSource, TKey>(
         this IEnumerable<TSource> source,
-        Func<TSource, TKey> keySelector)
+        Func<TSource, TKey> keySelector
+    )
     {
         return source
             .GroupBy(keySelector)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Single()
-            );
+            .ToDictionary(group => group.Key, group => group.Single());
     }
-}public static class ExtensionsOfListOfT{    public static List<T> Interleave<T, TKey>(
-        this List<T> source,
-        Func<T, TKey?> getKey)
+}
+
+public static class ExtensionsOfListOfT
+{
+    public static List<T> Interleave<T, TKey>(this List<T> source, Func<T, TKey?> getKey)
         where TKey : IComparable<TKey>
     {
-        var movables = source
-            .Where(item => getKey(item) != null)
-            .OrderBy(getKey)
-            .ToList();
+        var movables = source.Where(item => getKey(item) != null).OrderBy(getKey).ToList();
 
         var index = 0;
         var result = new List<T>(source.Count);
@@ -425,7 +449,11 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
         return result;
     }
-}public static class ExtensionsOfListOfTreeNodeOfSemanticNode{    public static IEnumerable<TreeNode<SemanticNode>> FindDelimitedText(
+}
+
+public static class ExtensionsOfListOfTreeNodeOfSemanticNode
+{
+    public static IEnumerable<TreeNode<SemanticNode>> FindDelimitedText(
         this List<TreeNode<SemanticNode>> roots,
         HashSet<SyntaxKind> delimeters
     )
@@ -451,12 +479,17 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
         return en.Select(t => t.Value.Text.Trim()).ToList();
     }
 
-    public static List<List<TreeNode<SemanticNode>>> GroupedByModifierKind(this List<TreeNode<SemanticNode>> children)
-        => children
+    public static List<List<TreeNode<SemanticNode>>> GroupedByModifierKind(
+        this List<TreeNode<SemanticNode>> children
+    ) =>
+        children
             .GroupBy(t => new { t.Value.Modifier, Kind = t.Value.Kind.ToHandled() })
             .Select(g => g.ToList())
             .ToList();
-    public static void SetStaticExtensionMethodsPublic(this List<TreeNode<SemanticNode>> extensionMethods)
+
+    public static void SetStaticExtensionMethodsPublic(
+        this List<TreeNode<SemanticNode>> extensionMethods
+    )
     {
         var casted = extensionMethods.Select(t => (MethodNode)t.Value).ToList();
         var privateMethods = casted.Where(t => t.Modifier == AccessModifier.Private).ToList();
@@ -466,13 +499,14 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
         }
     }
 
-    public static List<TreeNode<SemanticNode>> SortedByModifierKindName(this List<TreeNode<SemanticNode>> children)
-        => children
+    public static List<TreeNode<SemanticNode>> SortedByModifierKindName(
+        this List<TreeNode<SemanticNode>> children
+    ) =>
+        children
             .OrderBy(t => t.Value.Modifier)
             .ThenBy(t => t.Value.Kind.ToHandled())
             .ThenBy(t => t.Value.Name ?? "")
             .ToList();
-
 
     public static TreeNode<SemanticNode> WrapInDeclaration(
         this List<TreeNode<SemanticNode>> methods,
@@ -489,7 +523,10 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
         return root;
     }
-}public static class ExtensionsOfListOfTreeNodeOfT{
+}
+
+public static class ExtensionsOfListOfTreeNodeOfT
+{
     public static IEnumerable<TreeNode<T>> FindSkip<T>(
         this List<TreeNode<T>> roots,
         Func<TreeNode<T>, bool> predicate,
@@ -575,7 +612,11 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
                 yield return f;
         }
     }
-}public static class ExtensionsOfstring{    public static string NormalizeLineEndings(this string text)
+}
+
+public static class ExtensionsOfstring
+{
+    public static string NormalizeLineEndings(this string text)
     {
         if (string.IsNullOrEmpty(text))
             return text;
@@ -584,11 +625,16 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
             .Replace('\r', '\n') // convert old Mac Classic \r → \n
             .Replace("\n", "\r\n"); // unify everything to windows line endings
     }
+
     public static TreeNode<SemanticNode> ToTree(this string code)
     {
         return SemanticTree.DeserializeCode(code);
     }
-}public static class ExtensionsOfSyntaxKind{    public static SyntaxKindOrdering ToHandled(this SyntaxKind kind)
+}
+
+public static class ExtensionsOfSyntaxKind
+{
+    public static SyntaxKindOrdering ToHandled(this SyntaxKind kind)
     {
         return kind switch
         {
@@ -637,7 +683,11 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
             _ => throw new NotImplementedException(),
         };
     }
-}public static class ExtensionsOfSyntaxNode{    public static TreeNode<SemanticNode> ToTreeSemanticNode(this SyntaxNode node)
+}
+
+public static class ExtensionsOfSyntaxNode
+{
+    public static TreeNode<SemanticNode> ToTreeSemanticNode(this SyntaxNode node)
     {
         var ret = node.ToTreeTokenNode().ToTreeSyntaxElement().ToTreeSemanticNode();
         return ret;
@@ -666,19 +716,28 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
         return current;
     }
-}public static class ExtensionsOfT{    public static Queue<T> AsQueue<T>(this T item)
+}
+
+public static class ExtensionsOfT
+{
+    public static Queue<T> AsQueue<T>(this T item)
     {
         var queue = new Queue<T>();
         queue.Enqueue(item);
         return queue;
     }
-}public static class ExtensionsOfTreeNodeOfSemanticNode{
+}
+
+public static class ExtensionsOfTreeNodeOfSemanticNode
+{
     public static void AddMissingContainersAtDepth(
         this TreeNode<SemanticNode> destination,
         TreeNode<SemanticNode> source,
-        int depth)
+        int depth
+    )
     {
-        var missing = source.GetNamedNodesAtDepth(depth)
+        var missing = source
+            .GetNamedNodesAtDepth(depth)
             .Where(t => !t.Value.ChildOnly)
             .NotPresentIn(destination.GetNamedNodes());
 
@@ -691,7 +750,8 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
     public static void AddMissingContainersByDepthFrom(
         this TreeNode<SemanticNode> destination,
-        TreeNode<SemanticNode> source)
+        TreeNode<SemanticNode> source
+    )
     {
         var maxDepth = source.GetMaxParentCount();
 
@@ -701,7 +761,8 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
     public static void AddNewLowestLevelTypesFrom(
         this TreeNode<SemanticNode> destination,
-        List<TreeNode<SemanticNode>> source)
+        List<TreeNode<SemanticNode>> source
+    )
     {
         foreach (var sourceNode in source)
         {
@@ -713,15 +774,16 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
     public static void AddNewMember(
         this TreeNode<SemanticNode> parent,
-        TreeNode<SemanticNode> member)
+        TreeNode<SemanticNode> member
+    )
     {
-      if(member.Value.Name=="b")
+        if (member.Value.Name == "b")
         {
             int bp = 0;
         }
         parent.Value.MembersNode.AddChild(member);
-
     }
+
     public static List<string> AsCode<T>(this TreeNode<SemanticNode> tree)
     {
         var list = tree.Flatten().Select(t => t.ToCode()).ToList();
@@ -755,13 +817,19 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
     {
         root.DeleteRecursive(t => SyntaxKindGroups.CommentTrivia.Contains(t.Value.Kind));
     }
+
     public static void DeleteCompilationUnit(this TreeNode<SemanticNode> tree)
     {
-        foreach (var x in tree.FindWhere(t => t.Value.Kind == SyntaxKind.CompilationUnit).Skip(1).ToList())
+        foreach (
+            var x in tree.FindWhere(t => t.Value.Kind == SyntaxKind.CompilationUnit)
+                .Skip(1)
+                .ToList()
+        )
         {
             x.Delete(DeleteType.SingleNode);
         }
     }
+
     public static TreeNode<SemanticNode> DeleteExcessNewlines(this TreeNode<SemanticNode> root)
     {
         foreach (
@@ -781,11 +849,21 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
         return root;
     }
-    public static IEnumerable<TreeNode<SemanticNode>> DeleteKind(this TreeNode<SemanticNode> tree, SyntaxKind kind, DeleteType deleteType = DeleteType.SingleNode)
+
+    public static IEnumerable<TreeNode<SemanticNode>> DeleteKind(
+        this TreeNode<SemanticNode> tree,
+        SyntaxKind kind,
+        DeleteType deleteType = DeleteType.SingleNode
+    )
     {
         return tree.DeleteKinds(new HashSet<SyntaxKind>() { kind }, deleteType);
     }
-    public static IEnumerable<TreeNode<SemanticNode>> DeleteKinds(this TreeNode<SemanticNode> tree,HashSet<SyntaxKind> kinds,DeleteType deleteType=DeleteType.SingleNode)
+
+    public static IEnumerable<TreeNode<SemanticNode>> DeleteKinds(
+        this TreeNode<SemanticNode> tree,
+        HashSet<SyntaxKind> kinds,
+        DeleteType deleteType = DeleteType.SingleNode
+    )
     {
         foreach (var x in tree.FindWhere(t => kinds.Contains(t.Value.Kind)).ToList())
         {
@@ -836,10 +914,12 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
         tree.DeleteRecursive(t => t.Value.Kind == SyntaxKind.BaseList, DeleteType.NodeAndSubTree);
         tree.TestCompile(path.ProjectFilePath, path.ClassFilePath);
     }
+
     public static List<ClassNode> FindClasses(this TreeNode<SemanticNode> tree)
     {
         return tree.FindKindVal(SyntaxKind.ClassDeclaration).Cast<ClassNode>().ToList();
     }
+
     public static List<TreeNode<SemanticNode>> FindClassNodes(this TreeNode<SemanticNode> node)
     {
         return node.FindWhere(t => t.Value.Kind == SyntaxKind.ClassDeclaration).ToList();
@@ -894,14 +974,15 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
     public static TreeNode<SemanticNode> FindParentByFullName(
         this TreeNode<SemanticNode> root,
-        string parentFullName)
+        string parentFullName
+    )
     {
         if (string.IsNullOrEmpty(parentFullName))
             return root;
 
         return root.FindWhere(t =>
-                t.Value.FullName == parentFullName &&
-                t.Value is not UsingDirectiveNode)
+                t.Value.FullName == parentFullName && t.Value is not UsingDirectiveNode
+            )
             .First();
     }
 
@@ -998,13 +1079,12 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
         return result;
     }
 
-    public static List<TreeNode<SemanticNode>> GetLowestLevelTypes(this TreeNode<SemanticNode> root)
-        => root.FindWhere(t =>
-            t.Value.HasName &&
-            t.Value.ChildOnly).ToList();
+    public static List<TreeNode<SemanticNode>> GetLowestLevelTypes(
+        this TreeNode<SemanticNode> root
+    ) => root.FindWhere(t => t.Value.HasName && t.Value.ChildOnly).ToList();
 
-    public static int GetMaxParentCount(this TreeNode<SemanticNode> root)
-        => root.GetNamedNodes().Max(t => t.Value.Parents.Count);
+    public static int GetMaxParentCount(this TreeNode<SemanticNode> root) =>
+        root.GetNamedNodes().Max(t => t.Value.Parents.Count);
 
     public static List<MethodNode> GetMethods(this TreeNode<SemanticNode> tree)
     {
@@ -1013,18 +1093,25 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
             .ToList();
     }
 
-    public static IEnumerable<TreeNode<SemanticNode>> GetNamedNodes(this TreeNode<SemanticNode> root)
-        => root.FindWhere(t => t.Value.HasName);
+    public static IEnumerable<TreeNode<SemanticNode>> GetNamedNodes(
+        this TreeNode<SemanticNode> root
+    ) => root.FindWhere(t => t.Value.HasName);
 
     public static IEnumerable<TreeNode<SemanticNode>> GetNamedNodesAtDepth(
         this TreeNode<SemanticNode> root,
-        int depth)
-        => root.GetNamedNodes().Where(t => t.Value.Parents.Count == depth);
-    public static List<TreeNode<SemanticNode>> GetNonExtensionMethodsInExtensionClass(this TreeNode<SemanticNode> root)
+        int depth
+    ) => root.GetNamedNodes().Where(t => t.Value.Parents.Count == depth);
+
+    public static List<TreeNode<SemanticNode>> GetNonExtensionMethodsInExtensionClass(
+        this TreeNode<SemanticNode> root
+    )
     {
         var staticClasses = root.FindClasses().Where(c => c.IsStaticClass).ToList();
-        var ret = staticClasses.SelectMany(t => t.tree.GetMethods().Where(m => m.IsStatic && !m.IsExtension)
-                .Select(m => m.tree)).ToList();
+        var ret = staticClasses
+            .SelectMany(t =>
+                t.tree.GetMethods().Where(m => m.IsStatic && !m.IsExtension).Select(m => m.tree)
+            )
+            .ToList();
         return ret;
     }
 
@@ -1039,8 +1126,11 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
             .Select(t => (UsingDirectiveNode)t.Value)
             .ToList();
     }
-    public static (TreeNode<SemanticNode> Tree, List<List<TreeNode<SemanticNode>>> Groups)
-       GroupByModifierKindName(this TreeNode<SemanticNode> tree)
+
+    public static (
+        TreeNode<SemanticNode> Tree,
+        List<List<TreeNode<SemanticNode>>> Groups
+    ) GroupByModifierKindName(this TreeNode<SemanticNode> tree)
     {
         var groups = new List<List<TreeNode<SemanticNode>>>();
 
@@ -1053,6 +1143,7 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
         return (tree, groups);
     }
+
     public static TreeNode<SemanticNode> GroupConsecutiveChildren(
         this TreeNode<SemanticNode> node,
         Func<TreeNode<SemanticNode>, bool> predicate
@@ -1081,6 +1172,7 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
         copy.InitializeAllNodes();
         return copy;
     }
+
     public static void GroupStaticExtensionMethods(this TreeNode<SemanticNode> root)
     {
         var ret = new List<TreeNode<SemanticNode>>();
@@ -1088,13 +1180,15 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
         extensionMethods.SetStaticExtensionMethodsPublic();
 
         var classes = root.FindClasses().Where(t => t.IsStaticClass).ToList();
-        foreach(var c in classes)
+        foreach (var c in classes)
         {
             c.tree.RemoveSelf();
         }
 
-        var dict = extensionMethods.GroupBy(t => t.GetStaticClassName()).ToDictionary(t => t.Key, t => t.ToList());
-        
+        var dict = extensionMethods
+            .GroupBy(t => t.GetStaticClassName())
+            .ToDictionary(t => t.Key, t => t.ToList());
+
         foreach (var kv in dict)
         {
             string declaration = $"public static class {kv.Key}" + "{}";
@@ -1111,18 +1205,22 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
         node.Value.SetTreeNode(node);
     }
+
     public static TreeNode<SemanticNode> MergeFrom(
         this TreeNode<SemanticNode> destination,
-        TreeNode<SemanticNode> source)
+        TreeNode<SemanticNode> source
+    )
     {
         destination.AddMissingContainersByDepthFrom(source);
         var newLowLevel = destination.ReplaceExistingLowestLevelTypesFrom(source);
         destination.AddNewLowestLevelTypesFrom(newLowLevel);
         return destination;
     }
+
     public static TreeNode<SemanticNode> MergeSelf(this TreeNode<SemanticNode> source)
     {
-        if (source == null) return source;
+        if (source == null)
+            return source;
 
         var maxDepth = source.GetMaxParentCount();
 
@@ -1142,6 +1240,7 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
     {
         return treeNode.FindWhere(t => t.Value.Kind == kind).First();
     }
+
     public static void MoveNonExtensionStaticMethodsInStaticClassesIntoSingleClass(
         this TreeNode<SemanticNode> root
     )
@@ -1158,11 +1257,16 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
         var newClassTree = methodsToMove.WrapInDeclaration(declaration);
         root.Children.Add(newClassTree);
     }
+
     public static TreeNode<SemanticNode> OrderCollectionValues(
-       this TreeNode<SemanticNode> originalTree
-   )
+        this TreeNode<SemanticNode> originalTree
+    )
     {
-        foreach (var x in originalTree.FindWhere(t => SyntaxKindGroups.CollectionInitializerKinds.Contains(t.Value.Kind)))
+        foreach (
+            var x in originalTree.FindWhere(t =>
+                SyntaxKindGroups.CollectionInitializerKinds.Contains(t.Value.Kind)
+            )
+        )
         {
             x.Children = x.Children.Interleave(t => t.Value.Value);
         }
@@ -1197,10 +1301,7 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
     {
         var classes = node.FindClasses().Where(t => t.IsStaticClass).ToList();
         var emptyClasses = classes.Where(t => !t.HasMethods).ToList();
-        foreach (var e in emptyClasses)
-        {
-            
-        }
+        foreach (var e in emptyClasses) { }
 
         emptyClasses.ForEach(t => t.tree.RemoveSelf());
     }
@@ -1238,7 +1339,8 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
     public static List<TreeNode<SemanticNode>> ReplaceExistingLowestLevelTypesFrom(
         this TreeNode<SemanticNode> destination,
-        TreeNode<SemanticNode> source)
+        TreeNode<SemanticNode> source
+    )
     {
         var destByName = destination.GetLowestLevelTypes().ToDictionaryByFullName();
         var newLowLevelTypes = new List<TreeNode<SemanticNode>>();
@@ -1338,11 +1440,15 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
 
     private static void MergeAtDepth(this TreeNode<SemanticNode> source, int index)
     {
-        var toMerge = source.FindKinds(new HashSet<SyntaxKind>
-    {
-        SyntaxKind.ClassDeclaration,
-        SyntaxKind.NamespaceDeclaration
-    }).ToList();
+        var toMerge = source
+            .FindKinds(
+                new HashSet<SyntaxKind>
+                {
+                    SyntaxKind.ClassDeclaration,
+                    SyntaxKind.NamespaceDeclaration,
+                }
+            )
+            .ToList();
 
         var groups = toMerge
             .Where(t => t.Value.Parents.Count == index)
@@ -1355,12 +1461,16 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
             var first = group.First();
             foreach (var rest in group.Skip(1).ToList())
             {
-                first.MergeFrom(rest);   
+                first.MergeFrom(rest);
                 rest.RemoveSelf();
             }
         }
     }
-}public static class ExtensionsOfTreeNodeOfSyntaxElementNode{    public static TreeNode<SemanticNode> BuildTree(this TreeNode<SyntaxElementNode> syntaxNode)
+}
+
+public static class ExtensionsOfTreeNodeOfSyntaxElementNode
+{
+    public static TreeNode<SemanticNode> BuildTree(this TreeNode<SyntaxElementNode> syntaxNode)
     {
         var semantic = syntaxNode.Value.CreateSemantic();
         var treeNode = new TreeNode<SemanticNode>(semantic);
@@ -1382,7 +1492,11 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
         tree.InitializeAllNodes();
         return tree;
     }
-}public static class ExtensionsOfTreeNodeOfTokenNode{    public static TreeNode<SyntaxElementNode> ToSyntaxElementTree(
+}
+
+public static class ExtensionsOfTreeNodeOfTokenNode
+{
+    public static TreeNode<SyntaxElementNode> ToSyntaxElementTree(
         this TreeNode<TokenNode> tokenNode
     )
     {
@@ -1420,6 +1534,7 @@ public static class ExtensionsOfAccessModifier{    public static SyntaxKind ToSy
         return tokenRoot.ToSyntaxElementTree();
     }
 }
+
 public class FieldNode : NamedMemberNode
 {
     public FieldNode(SyntaxElementNode b)
@@ -1507,9 +1622,7 @@ public class FileScopedNamespaceNode : NamespaceNode
 
 public class ImplementTBD : NotImplementedException
 {
-    public ImplementTBD(string description)
-    {
-    }
+    public ImplementTBD(string description) { }
 }
 
 public class IndexerNode : ParameterizedMemberNode
@@ -1527,6 +1640,7 @@ public class InterfaceNode : TypeDeclarationNode
 
     protected override SyntaxKind? GetTypeSpecificKeyword() => SyntaxKind.InterfaceKeyword;
 }
+
 
 
 public class MethodNode : ParameterizedMemberWithBodyNode
@@ -1557,28 +1671,25 @@ public abstract class NamedMemberNode : NamedNode
         base.SetTreeNode(tree);
         SetModifierFromTree();
     }
+
     public TreeNode<SemanticNode> ModifierNode;
-    public override AccessModifier Modifier 
-    { 
-        get 
+    public override AccessModifier Modifier
+    {
+        get
         {
             if (ModifierNode == null)
                 return DefaultModifier;
             else
-               return ModifierNode.Value.Kind.ToModifier();
-
+                return ModifierNode.Value.Kind.ToModifier();
         }
-        set
-        {
-            SetModifier(value);
-        }
+        set { SetModifier(value); }
     }
 
     protected NamedMemberNode(SyntaxElementNode backing)
-        : base(backing)
-    {
-    }
+        : base(backing) { }
+
     protected virtual AccessModifier DefaultModifier => AccessModifier.Private;
+
     TreeNode<SemanticNode> SetModifier(AccessModifier modifier)
     {
         if (
@@ -1611,7 +1722,7 @@ public abstract class NamedMemberNode : NamedNode
 
     void SetModifierFromTree()
     {
-        ModifierNode= tree.FindWhere(t => SyntaxKindGroups.ModifierKinds.Contains(t.Value.Kind))
+        ModifierNode = tree.FindWhere(t => SyntaxKindGroups.ModifierKinds.Contains(t.Value.Kind))
             .FirstOrDefault();
     }
 }
@@ -1640,16 +1751,18 @@ public abstract class NamedNode : SemanticNode
 
     protected NamedNode(SyntaxElementNode b)
         : base(b) { }
+
     protected HashSet<SyntaxKind> endDelimeter;
 }
 
 public class NamespaceNode : TypeDeclarationNode
 {
-        public NamespaceNode(SyntaxElementNode b)
+    public NamespaceNode(SyntaxElementNode b)
         : base(b)
     {
         endDelimeter = new HashSet<SyntaxKind>() { SyntaxKind.OpenBraceToken };
     }
+
     public override void AttachChild(SemanticNode child)
     {
         if (child is UsingDirectiveNode u)
@@ -1664,6 +1777,7 @@ public class NamespaceNode : TypeDeclarationNode
         var root = CSharpSyntaxTree.ParseText(code).GetRoot().ToTreeSemanticNode();
         return root.Children.First(t => t.Value.Kind == SyntaxKind.NamespaceDeclaration);
     }
+
     public override void SetNameNode()
     {
         this.SetName(endDelimeter);
@@ -1671,7 +1785,9 @@ public class NamespaceNode : TypeDeclarationNode
 
     public List<SemanticNode> Members { get; } = new();
     public List<UsingDirectiveNode> Usings { get; } = new();
+
     protected override SyntaxKind? GetTypeSpecificKeyword() => SyntaxKind.NamespaceKeyword;
+
     protected override AccessModifier DefaultModifier => AccessModifier.Public;
 }
 
@@ -1885,11 +2001,11 @@ public abstract class SemanticNode : BaseNode<SemanticNode>
     }
 
     public virtual void SetBaseClass() { }
+
     public virtual void SetTreeNode(TreeNode<SemanticNode> tree)
     {
         this.tree = tree;
     }
-
 
     public override string ToString()
     {
@@ -1913,10 +2029,7 @@ public abstract class SemanticNode : BaseNode<SemanticNode>
     public string? Text;
     public bool ChildOnly
     {
-        get
-        {
-             return !this.tree.FindWhere(t => t.Value.HasName).Skip(1).Any();
-        }
+        get { return !this.tree.FindWhere(t => t.Value.HasName).Skip(1).Any(); }
     }
     public string FullName
     {
@@ -1928,18 +2041,12 @@ public abstract class SemanticNode : BaseNode<SemanticNode>
     }
     public bool HasDirectNamedChildren
     {
-        get
-        {
-            return this.tree.Children.Where(t => t.Value.HasName).Any();
-        }
+        get { return this.tree.Children.Where(t => t.Value.HasName).Any(); }
     }
     public bool HasName => Name != null && Name != string.Empty;
     public virtual TreeNode<SemanticNode> MembersNode
     {
-        get
-        {
-            return this.tree;
-        }
+        get { return this.tree; }
     }
     public virtual AccessModifier Modifier { get; set; } = AccessModifier.None;
 
@@ -1956,7 +2063,7 @@ public abstract class SemanticNode : BaseNode<SemanticNode>
     {
         get
         {
-            
+
             return String.Join(".", Parents);
         }
     }
@@ -1989,6 +2096,7 @@ public abstract class SemanticNode : BaseNode<SemanticNode>
         }
     }
     public virtual string Value => null;
+
     protected SemanticNode(SyntaxElementNode backing)
     {
         Kind = backing.Kind;
@@ -2129,7 +2237,6 @@ public class SimpleMemberAccessNode : SemanticNode
     {
         base.SetTreeNode(tree);
 
-
         if (
             tree.Parent == null
             || !SyntaxKindGroups.CollectionInitializerKinds.Contains(tree.Parent.Value.Kind)
@@ -2148,6 +2255,7 @@ public class SimpleMemberAccessNode : SemanticNode
         ValueNode = list.First();
         ValueNode.Value.Text = val;
     }
+
     public TreeNode<SemanticNode> ValueNode;
     public override string Value
     {
@@ -2159,7 +2267,9 @@ public class SimpleMemberAccessNode : SemanticNode
         }
     }
 }
-public class StaticHelpers {}
+
+public class StaticHelpers { }
+
 public class StructNode : TypeDeclarationNode
 {
     public StructNode(SyntaxElementNode b)
@@ -2167,6 +2277,7 @@ public class StructNode : TypeDeclarationNode
 
     protected override SyntaxKind? GetTypeSpecificKeyword() => SyntaxKind.StructKeyword;
 }
+
 public class SyntaxElementNode : BaseNode<SyntaxElementNode>
 {
     public SyntaxElementNode(SyntaxKind kind, string text)
@@ -2250,7 +2361,6 @@ public class SyntaxElementNode : BaseNode<SyntaxElementNode>
     }
 }
 
-
 public class SyntaxKindGroups
 {
     public static readonly HashSet<SyntaxKind> BodyElements = new HashSet<SyntaxKind>
@@ -2283,25 +2393,24 @@ public class SyntaxKindGroups
         SyntaxKind.YieldReturnStatement,
     };
     public static readonly HashSet<SyntaxKind> ClassMemberKinds = new()
-{
-
-    SyntaxKind.ConstructorDeclaration,
-    SyntaxKind.ConversionOperatorDeclaration,
-    SyntaxKind.DelegateDeclaration,
-    SyntaxKind.DestructorDeclaration,
-    SyntaxKind.EnumDeclaration,
-    SyntaxKind.EventDeclaration,
-    SyntaxKind.EventFieldDeclaration,
-    SyntaxKind.FieldDeclaration,
-    SyntaxKind.IndexerDeclaration,
-    SyntaxKind.InterfaceDeclaration,
-    SyntaxKind.MethodDeclaration,
-    SyntaxKind.OperatorDeclaration,
-    SyntaxKind.PropertyDeclaration,
-    SyntaxKind.RecordDeclaration,
-    SyntaxKind.RecordStructDeclaration,
-    SyntaxKind.StructDeclaration,
-};
+    {
+        SyntaxKind.ConstructorDeclaration,
+        SyntaxKind.ConversionOperatorDeclaration,
+        SyntaxKind.DelegateDeclaration,
+        SyntaxKind.DestructorDeclaration,
+        SyntaxKind.EnumDeclaration,
+        SyntaxKind.EventDeclaration,
+        SyntaxKind.EventFieldDeclaration,
+        SyntaxKind.FieldDeclaration,
+        SyntaxKind.IndexerDeclaration,
+        SyntaxKind.InterfaceDeclaration,
+        SyntaxKind.MethodDeclaration,
+        SyntaxKind.OperatorDeclaration,
+        SyntaxKind.PropertyDeclaration,
+        SyntaxKind.RecordDeclaration,
+        SyntaxKind.RecordStructDeclaration,
+        SyntaxKind.StructDeclaration,
+    };
     public static readonly HashSet<SyntaxKind> CollectionInitializerKinds = new()
     {
         SyntaxKind.ArrayInitializerExpression,
@@ -2413,19 +2522,18 @@ public class SyntaxKindGroups
         SyntaxKind.PublicKeyword,
     };
     public static readonly HashSet<SyntaxKind> NamespaceMemberKinds = new()
-{
-    SyntaxKind.ClassDeclaration,
-    SyntaxKind.DelegateDeclaration,
-    SyntaxKind.EnumDeclaration,
-    SyntaxKind.FileScopedNamespaceDeclaration,
-    SyntaxKind.InterfaceDeclaration,
-    SyntaxKind.NamespaceDeclaration,
-    SyntaxKind.RecordDeclaration,
-    SyntaxKind.RecordStructDeclaration,
-    SyntaxKind.StructDeclaration,
-    SyntaxKind.UsingDirective,
-};
-
+    {
+        SyntaxKind.ClassDeclaration,
+        SyntaxKind.DelegateDeclaration,
+        SyntaxKind.EnumDeclaration,
+        SyntaxKind.FileScopedNamespaceDeclaration,
+        SyntaxKind.InterfaceDeclaration,
+        SyntaxKind.NamespaceDeclaration,
+        SyntaxKind.RecordDeclaration,
+        SyntaxKind.RecordStructDeclaration,
+        SyntaxKind.StructDeclaration,
+        SyntaxKind.UsingDirective,
+    };
 
     public static readonly HashSet<SyntaxKind> NamespaceTypeChildren = new HashSet<SyntaxKind>
     {
@@ -2444,7 +2552,7 @@ public class SyntaxKindGroups
         SyntaxKind.FileScopedNamespaceDeclaration,
         SyntaxKind.GlobalStatement,
         SyntaxKind.NamespaceDeclaration,
-        SyntaxKind.UsingDirective
+        SyntaxKind.UsingDirective,
     };
 
     public static readonly HashSet<SyntaxKind> TypeDeclarations = new HashSet<SyntaxKind>
@@ -2648,14 +2756,12 @@ public partial class TokenNode : BaseNode<TokenNode>
                 Identifier = token.Text;
 
             LeadingTrivia = token
-                .LeadingTrivia
-                .Select(t => new SyntaxElementNode(t.Kind(), t.ToFullString()))
+                .LeadingTrivia.Select(t => new SyntaxElementNode(t.Kind(), t.ToFullString()))
                 .ToList()
                 .AsReadOnly();
 
             TrailingTrivia = token
-                .TrailingTrivia
-                .Select(t => new SyntaxElementNode(t.Kind(), t.ToFullString()))
+                .TrailingTrivia.Select(t => new SyntaxElementNode(t.Kind(), t.ToFullString()))
                 .ToList()
                 .AsReadOnly();
         }
@@ -2704,17 +2810,21 @@ public partial class TokenNode : BaseNode<TokenNode>
         elements.AddRange(TrailingTrivia);
         return elements;
     }
+
     public string? Identifier { get; }
 
     public SyntaxKind Kind { get; }
-    public IReadOnlyList<SyntaxElementNode> LeadingTrivia { get; private set; } = Array.Empty<SyntaxElementNode>();
+    public IReadOnlyList<SyntaxElementNode> LeadingTrivia { get; private set; } =
+        Array.Empty<SyntaxElementNode>();
     public SyntaxNode? OriginalSyntaxNode { get; }
     public string? Text { get; }
-    public IReadOnlyList<SyntaxElementNode> TrailingTrivia { get; private set; } = Array.Empty<SyntaxElementNode>();
+    public IReadOnlyList<SyntaxElementNode> TrailingTrivia { get; private set; } =
+        Array.Empty<SyntaxElementNode>();
 
     private static bool IsTrivialWhitespace(SyntaxKind k) =>
         k is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia;
 }
+
 public partial class TreeNode<T>
     where T : BaseNode<T>
 {
@@ -2895,9 +3005,9 @@ public partial class TreeNode<T>
     }
 
     public IEnumerable<TreeNode<T>> FindWhereStop(
-      Func<TreeNode<T>, bool> predicate,
-      Func<TreeNode<T>, bool> untilPredicate
-  )
+        Func<TreeNode<T>, bool> predicate,
+        Func<TreeNode<T>, bool> untilPredicate
+    )
     {
         if (untilPredicate(this))
             yield break;
@@ -2905,7 +3015,7 @@ public partial class TreeNode<T>
         if (predicate(this))
             yield return this;
 
-        foreach (var found in this.Children.FindWhereStop(predicate,untilPredicate))
+        foreach (var found in this.Children.FindWhereStop(predicate, untilPredicate))
             yield return found;
     }
 
@@ -3043,6 +3153,7 @@ public abstract class TypeDeclarationNode : NamedMemberNode
             return;
         this.BaseClass = BaseTypes.First();
     }
+
     public override void SetTreeNode(TreeNode<SemanticNode> t)
     {
         base.SetTreeNode(t);
@@ -3053,10 +3164,7 @@ public abstract class TypeDeclarationNode : NamedMemberNode
     public HashSet<string> BaseTypes { get; } = new(StringComparer.Ordinal);
     public override TreeNode<SemanticNode> MembersNode
     {
-        get
-        {
-            return this.tree.Children[1];
-        }
+        get { return this.tree.Children[1]; }
     }
 
     protected TypeDeclarationNode(SyntaxElementNode b)
@@ -3103,6 +3211,7 @@ public class UsingDirectiveNode : NamedNode
         this.endDelimeter = new HashSet<SyntaxKind> { SyntaxKind.SemicolonToken };
         Modifier = AccessModifier.Public;
     }
+
     public override void SetNameNode()
     {
         SetName(endDelimeter);
@@ -3138,8 +3247,9 @@ public enum ProjectName
     Evolver5,
     RevMo,
     Shared,
-    Test
+    Test,
 }
+
 public enum SyntaxKindOrdering
 {
     UsingDirective,
@@ -3174,11 +3284,9 @@ public enum SyntaxKindOrdering
     Unknown,
 }
 
-
-
 public partial record ProjectPaths
 {
-    public ProjectPaths(string baseNamespace,string root_directory)
+    public ProjectPaths(string baseNamespace, string root_directory)
     {
         this.root_directory = root_directory;
         if (string.IsNullOrWhiteSpace(baseNamespace))
@@ -3193,7 +3301,8 @@ public partial record ProjectPaths
         MethodFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Method_Prefix}.cs");
     }
 
-    public static ProjectPaths Create(string baseNamespace,string rootDir) => new(baseNamespace,rootDir);
+    public static ProjectPaths Create(string baseNamespace, string rootDir) =>
+        new(baseNamespace, rootDir);
 
     // ==================== All Core Methods ====================
     public void FlattenClassesOutOfNamespaces()
@@ -3272,7 +3381,7 @@ public partial record ProjectPaths
         writer ??= Console.Out;
         foreach (var (label, path) in ToPathDictionary())
         {
-            writer.WriteLine($"{label,-34} : {path}");
+            writer.WriteLine($"{label, -34} : {path}");
         }
     }
 
@@ -3326,7 +3435,8 @@ public partial record ProjectPaths
     public string NamespaceConsolidated => $"{BaseNamespace}";
     public string OneClassPerFileNamespace => $"{BaseNamespace}.{OneClassPerFileNamespaceSuffix}";
     public string OneClassPerFileNamespaceSuffix => one_class_per_file_namespace;
-    public string OneNamespacePerFileNamespace => $"{BaseNamespace}.{OneNamespacePerFileNamespaceSuffix}";
+    public string OneNamespacePerFileNamespace =>
+        $"{BaseNamespace}.{OneNamespacePerFileNamespaceSuffix}";
     public string OneNamespacePerFileNamespaceSuffix => one_namespace_per_file_namespace;
     public string ProjectFilePath { get; }
     public virtual string RootDirectory => $@"{root_directory}{BaseNamespace}";
@@ -3350,7 +3460,8 @@ public partial record ProjectPaths
 
     private Dictionary<string, List<TreeNode<SemanticNode>>> BuildDerivedMap(
         List<ClassNode> classes,
-        Dictionary<string, TreeNode<SemanticNode>> byName)
+        Dictionary<string, TreeNode<SemanticNode>> byName
+    )
     {
         var map = new Dictionary<string, List<TreeNode<SemanticNode>>>();
         foreach (var c in classes)
@@ -3364,5 +3475,6 @@ public partial record ProjectPaths
         }
         return map;
     }
+
     string root_directory;
 }
