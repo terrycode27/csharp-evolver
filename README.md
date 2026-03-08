@@ -1,58 +1,11 @@
-Evolver5
-Semantic Code Evolution Engine
-The rock-solid foundation for agentic coding agents
-Stop feeding LLMs raw strings.
-Give your coding agents a semantic brain that understands structure, merges intelligently, and never breaks your codebase.
-Why Evolver5 exists
-Modern AI coding agents are powerful — until they edit real code.
-String replacements break formatting.
-Naive edits destroy namespaces, modifiers and structure.
-Merges become painful.
-Evolver5 solves this.
-Built on Roslyn, it provides a rich semantic model with intelligent merging, automatic code organization, and compilation safety guarantees.
-Your agents stop guessing and start engineering.
-Core Capabilities
-C#
-var source = path.LoadTree("MergeSource");
-var dest   = path.LoadTree("MergeDest");
-
-dest.MergeSelf();
-dest.MergeFrom(source);
-dest.GroupByModifierKindName();
-dest.ToFormattedFile("result.cs");
-Agent workflows enabled:
-
-Safe autonomous merging of features
-Large-scale refactoring
-Skeleton generation for LLM code completion
-Codebase normalization and cleanup
-Safe evolution across multiple forks
-Self-healing edit → compile → validate loops
-
-Key Features
-
-Rich semantic node model (ClassNode, MethodNode, ParameterNode with IsThis/IsRef/etc.)
-Deterministic merge engine with container awareness
-Automatic grouping by access modifier → kind → name
-Extension method organization
-Namespace flattening and management
-Skeleton mode (empty method bodies)
-Full round-trip compilation testing
-CSharpier formatting integration
-Project-aware paths and utilities
-
-Quick Start
-
-Clone the repository
-Open Evolver5.sln
-Run Program.Main() to see a full merge + organize + format cycle
-Start integrating into your agents using the ProjectPaths and TreeNode APIs
-
-Who is this for?
-
-Teams building autonomous coding agents
-AI coding research and infrastructure
-Companies maintaining large internal toolsets
-Anyone who wants agents that respect real code structure
-
-Evolver5 — Because agents deserve better than regex and string hacks.
+Evolver5 is a semantic code engine designed as the foundation for serious agentic coding systems.
+Most AI coding agents fail at scale because they only work with raw text. They break formatting, damage existing structure, create inconsistent style, and frequently generate code that doesn't compile.
+Evolver5 solves these problems by converting C# into a rich semantic tree using Roslyn. This gives agents precise surgical control over code instead of relying on dangerous string changes.
+Agents using Evolver5 can safely merge new code into existing projects, automatically organize classes and members by access level and name, intelligently group extension methods, generate compilable skeleton code, and verify that changes still compile.
+A typical agent workflow looks like this:
+Load the current code and the AI-generated code.
+Merge them together using intelligent semantic merging.
+Automatically group and sort members for consistency.
+Format and save the final result.
+Evolver5 was built specifically to turn experimental AI coding agents into reliable systems capable of working on real production codebases.
+The complete source is in Evolver5.cs. Just run the Main method to see it merge two different code files cleanly and correctly.
