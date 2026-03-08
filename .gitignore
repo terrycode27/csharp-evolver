@@ -5,3 +5,7 @@
 .vs/Evolver5/FileContentIndex/54bb0c4b-8b58-45cf-9aa1-a1d6c22c0501.vsidx
 .vs/Evolver5/FileContentIndex/faa726cd-8538-4920-9375-4f5ae8dd0416.vsidx
 *.vsidx
+.vs/Evolver5/DesignTimeBuild/.dtbcache.v2
+.vs/Evolver5/v18/.suo
+Test/Evolver5_Method.cs
+Test/Evolver5_Class.cs
