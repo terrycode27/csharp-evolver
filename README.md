@@ -1,77 +1,58 @@
-# csharp-evolver
-csharp-evolver is a Roslyn-powered C# transformation engine focused on split and merge capabilities. It intelligently merges partial classes and namespaces while also splitting code into skeletons, grouping extensions, and reorganizing hierarchies. Includes round-trip compilation and CSharpier formatting. Ideal for large-scale .NET refactoring.
-# Evolver5
+Evolver5
+Semantic Code Evolution Engine
+The rock-solid foundation for agentic coding agents
+Stop feeding LLMs raw strings.
+Give your coding agents a semantic brain that understands structure, merges intelligently, and never breaks your codebase.
+Why Evolver5 exists
+Modern AI coding agents are powerful — until they edit real code.
+String replacements break formatting.
+Naive edits destroy namespaces, modifiers and structure.
+Merges become painful.
+Evolver5 solves this.
+Built on Roslyn, it provides a rich semantic model with intelligent merging, automatic code organization, and compilation safety guarantees.
+Your agents stop guessing and start engineering.
+Core Capabilities
+C#
+var source = path.LoadTree("MergeSource");
+var dest   = path.LoadTree("MergeDest");
 
-https://grok.com/share/c2hhcmQtMg_83e2433f-461c-4b85-83d5-57d90d183035
+dest.MergeSelf();
+dest.MergeFrom(source);
+dest.GroupByModifierKindName();
+dest.ToFormattedFile("result.cs");
+Agent workflows enabled:
 
-**Semantic C# Code Tree & Automated Refactoring Engine**
+Safe autonomous merging of features
+Large-scale refactoring
+Skeleton generation for LLM code completion
+Codebase normalization and cleanup
+Safe evolution across multiple forks
+Self-healing edit → compile → validate loops
 
-A powerful, Roslyn-based library that turns any C# source code into a rich **semantic tree** for safe, high-level refactoring and code evolution.
+Key Features
 
-Perfect for:
-- Reorganizing messy codebases
-- Standardizing member ordering
-- Auto-grouping extension methods
-- Merging partial classes/namespaces
-- Generating clean skeletons
-- Round-trip compilation verification
+Rich semantic node model (ClassNode, MethodNode, ParameterNode with IsThis/IsRef/etc.)
+Deterministic merge engine with container awareness
+Automatic grouping by access modifier → kind → name
+Extension method organization
+Namespace flattening and management
+Skeleton mode (empty method bodies)
+Full round-trip compilation testing
+CSharpier formatting integration
+Project-aware paths and utilities
 
----
+Quick Start
 
-## ✨ Features
+Clone the repository
+Open Evolver5.sln
+Run Program.Main() to see a full merge + organize + format cycle
+Start integrating into your agents using the ProjectPaths and TreeNode APIs
 
-- **Full round-trip parsing** — parse → manipulate → regenerate identical code
-- **Smart grouping** — by access modifier → kind → name
-- **Extension method magic** — automatically creates `ExtensionsOfXXX` static classes
-- **Namespace flattening** — collapse everything into one clean file
-- **Safe merging** — merge duplicate classes/namespaces without conflicts
-- **Skeleton generation** — empty method bodies with `NotImplementedException`
-- **Built-in compilation testing**
-- **CSharpier formatting** integration
-- **Class hierarchy regions** — group derived classes under `#region`
-- **Project-aware** — works directly with `.csproj` files via MSBuild
+Who is this for?
 
----
+Teams building autonomous coding agents
+AI coding research and infrastructure
+Companies maintaining large internal toolsets
+Anyone who wants agents that respect real code structure
 
-## 📋 Requirements
-
-- **.NET 6.0+**
-- **NuGet packages** (already referenced):
-  - `Microsoft.CodeAnalysis.CSharp`
-  - `Microsoft.CodeAnalysis.CSharp.Workspaces`
-  - `Microsoft.Build.Locator`
-  - `CSharpier.Core` (bundled in `_dependency\CSharpier`)
-
----
-
-## 🚀 Installation
-
-Just drop **`Evolver5.cs`** into your project (single-file library style).
-
----
-
-## 📖 Sample Usage
-
-### 1. Quick Reorder & Format (Most Common)
-
-```csharp
-var paths = ProjectPaths.Create("MyAwesomeLibrary", @"C:\Projects\MyAwesomeLibrary\");
-
-paths.FlattenClassesOutOfNamespaces();
-paths.GroupByModifierKindName();
-paths.GroupStaticExtensionMethods();
-paths.Format();
-
-
-2. Create a Clean Skeleton
-
-var tree = SemanticTree.DeserializeFile("MyBigClass.cs", fmt: true);
-tree.EmptyMemberDeclarationsContents(paths);
-tree.ToFormattedFile("MyBigClass.Skeleton.cs");
-
-
-3. Merge Two Code Versions
-
-var merged = baseTree.MergeFrom(newTree);
-merged.ToFormattedFile("merged.cs");
-
+Evolver5 — Because agents deserve better than regex and string hacks.
