@@ -1,3 +1,12 @@
+using Microsoft.Build.Locator;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Emit;
+using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.MSBuild;
+
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -14,26 +23,31 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web.Http.Filters;
 using System.Xml.Linq;
-using Microsoft.Build.Locator;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Emit;
-using Microsoft.CodeAnalysis.Formatting;
-using Microsoft.CodeAnalysis.MSBuild;
-using Microsoft.Identity.Client;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.TeamFoundation.TestManagement.WebApi;
-using Microsoft.VisualStudio.Services.Commerce;
-using Microsoft.VisualStudio.Services.Common;
-using Microsoft.VisualStudio.Services.FormInput;
-using Newtonsoft.Json.Linq;
-using Shared;
 using static System.Net.Mime.MediaTypeNames;
 
-
+public class _Program
+{
+    public static void Main()
+    {
+        var path = KnownProjectPaths.Evolver5;
+        var source=path.LoadTree(@"MergeSource","test");
+        var dest = path.LoadTree(@"MergeDest","test");
+        dest.MergeSelf();
+        dest.MergeFrom(source);
+        dest.GroupByModifierKindName();
+        dest.ToFormattedFile(path.GetFilePath("MergeResult","test"));
+    }
+    static class KnownProjectPaths
+    {
+        public static ProjectPaths Evolver5 => new("Evolver5");
+        
+        // ==================== ADD YOUR INTERNAL PROJECTS HERE ====================
+        // public static ProjectPaths MyInternalTool  => new("MyInternalTool");
+        // public static ProjectPaths CustomerABC     => new("CustomerABC");
+        // public static ProjectPaths DataPipeline    => new("DataPipeline");
+    }
+}
 
 public class BaseNode<T>
     where T : BaseNode<T>
@@ -43,28 +57,28 @@ public class BaseNode<T>
 
 public class BlockNode : SemanticNode
 {
-    public BlockNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void AttachChild(SemanticNode child)
     {
         Statements.Add(child);
     }
+
+    public BlockNode(SyntaxElementNode b)
+        : base(b) { }
 
     public List<SemanticNode> Statements { get; } = new();
 }
 
 public class ClassNode : TypeDeclarationNode
 {
-    public ClassNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void AttachChild(SemanticNode child)
     {
         base.AttachChild(child);
         if (child is DelegateNode del)
             Delegates.Add(del);
     }
+
+    public ClassNode(SyntaxElementNode b)
+        : base(b) { }
 
     public List<DelegateNode> Delegates { get; } = new();
 
@@ -96,12 +110,6 @@ public class CommentNode : TriviaNode
 
 public class CompilationUnitNode : SemanticNode
 {
-    public CompilationUnitNode()
-        : base(new SyntaxElementNode(SyntaxKind.CompilationUnit, null)) { }
-
-    public CompilationUnitNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void AttachChild(SemanticNode child)
     {
         if (child is UsingDirectiveNode u)
@@ -114,6 +122,12 @@ public class CompilationUnitNode : SemanticNode
     {
         return new TreeNode<SemanticNode>(new CompilationUnitNode());
     }
+
+    public CompilationUnitNode()
+        : base(new SyntaxElementNode(SyntaxKind.CompilationUnit, null)) { }
+
+    public CompilationUnitNode(SyntaxElementNode b)
+        : base(b) { }
 
     public List<object> KeyPath;
 
@@ -209,11 +223,6 @@ public class CSharpierFormatter
         }
     }
 
-    static CSharpierFormatter()
-    {
-        Initialize();
-    }
-
     private static void BecauseNewerRoslynBreaksCSharpier(string path)
     {
         var dll = Directory.Exists(path) ? Path.Combine(path, "CSharpier.Core.dll") : path;
@@ -242,6 +251,11 @@ public class CSharpierFormatter
         );
     }
 
+    static CSharpierFormatter()
+    {
+        Initialize();
+    }
+
     private static AssemblyLoadContext context;
     private static string csharpierPath = @"_dependency\CSharpier";
     private static MethodInfo formatMethod;
@@ -251,14 +265,14 @@ public class CSharpierFormatter
 
 public class DelegateNode : TypeDeclarationNode
 {
-    public DelegateNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void AttachChild(SemanticNode child)
     {
         if (child is ParameterListNode pl)
             ParameterList = pl;
     }
+
+    public DelegateNode(SyntaxElementNode b)
+        : base(b) { }
 
     public ParameterListNode? ParameterList { get; set; }
 
@@ -279,14 +293,14 @@ public class EnumMemberNode : NamedNode
 
 public class EnumNode : TypeDeclarationNode
 {
-    public EnumNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void AttachChild(SemanticNode child)
     {
         if (child is EnumMemberNode em)
             Members.Add(em);
     }
+
+    public EnumNode(SyntaxElementNode b)
+        : base(b) { }
 
     public List<EnumMemberNode> Members { get; } = new();
 
@@ -295,13 +309,13 @@ public class EnumNode : TypeDeclarationNode
 
 public class EventFieldNode : NamedMemberNode
 {
-    public EventFieldNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void SetNameNode()
     {
         NameNode = tree.FindNameAfterTypeBeforeSemicolon();
     }
+
+    public EventFieldNode(SyntaxElementNode b)
+        : base(b) { }
 }
 
 public class EventNode : NamedMemberNode
@@ -315,7 +329,28 @@ public class ExpressionBodyNode : SemanticNode
     public ExpressionBodyNode(SyntaxElementNode b)
         : base(b) { }
 }
+public static class ExtensionsOfAppDomain
+{
+    public static string GetSolutionBaseFolder(this AppDomain domain)
+    {
+        ArgumentNullException.ThrowIfNull(domain);
 
+        var dir = new DirectoryInfo(domain.BaseDirectory);
+        int maxLevels = 10; // safety limit (normal project structure is 3-6 levels)
+
+        while (dir != null && maxLevels-- > 0)
+        {
+            if (dir.GetFiles("*.cs", SearchOption.TopDirectoryOnly).Any())
+            {
+                return dir.Parent.FullName;
+            }
+
+            dir = dir.Parent;
+        }
+
+        return domain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+}
 public static class ExtensionsOfAccessModifier
 {
     public static SyntaxKind ToSyntaxKind(this AccessModifier modifier)
@@ -431,6 +466,13 @@ public static class ExtensionsOfIEnumerableOfTSource
 
 public static class ExtensionsOfListOfT
 {
+    public static void ForEach<T>(this IEnumerable<T> source, Action<T> action)
+    {
+        if (source == null) throw new ArgumentNullException(nameof(source));
+        if (action == null) throw new ArgumentNullException(nameof(action));
+        foreach (var item in source)
+            action(item);
+    }
     public static List<T> Interleave<T, TKey>(this List<T> source, Func<T, TKey?> getKey)
         where TKey : IComparable<TKey>
     {
@@ -720,6 +762,42 @@ public static class ExtensionsOfSyntaxNode
 
 public static class ExtensionsOfT
 {
+    public static List<T> ToSingletonList<T>(this T item)
+    {
+        return [item];
+    }
+
+    /// <summary>
+    /// Alias many teams prefer: short and clear
+    /// </summary>
+    public static List<T> AsList<T>(this T item)
+    {
+        return [item];
+    }
+
+    /// <summary>
+    /// Returns a list containing the item, or an empty list if the item is null (reference types).
+    /// </summary>
+    public static List<T> AsListOrEmpty<T>(this T? item) where T : class
+    {
+        return item is null ? [] : [item];
+    }
+
+    /// <summary>
+    /// Wraps the item in a single-element array (very fast & memory efficient).
+    /// </summary>
+    public static T[] AsArray<T>(this T item)
+    {
+        return [item];
+    }
+
+    /// <summary>
+    /// Returns a single-item sequence (most flexible when you just need IEnumerable&lt;T&gt;).
+    /// </summary>
+    public static IEnumerable<T> Yield<T>(this T item)
+    {
+        yield return item;
+    }
     public static Queue<T> AsQueue<T>(this T item)
     {
         var queue = new Queue<T>();
@@ -956,20 +1034,29 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         return tree.FindKind(kind).Select(t => t.Value).ToList();
     }
 
-    public static TreeNode<SemanticNode> FindNameAfterTypeBeforeSemicolon(
-        this TreeNode<SemanticNode> tree
+    public static TreeNode<SemanticNode> FindNameAfterType(
+        this TreeNode<SemanticNode> tree,
+        HashSet<SyntaxKind> stopKinds
     )
     {
         return tree.FindSkipStop(
                 t => t.Value.Kind == SyntaxKind.IdentifierToken,
                 t =>
-                    t.Value.Kind == SyntaxKind.PredefinedType
-                    || t.Value.Kind == SyntaxKind.IdentifierName
-                    || t.Value.Kind == SyntaxKind.GenericName
-                    || SyntaxKindGroups.ModifierKinds.Contains(t.Value.Kind),
-                t => t.Value.Kind == SyntaxKind.SemicolonToken
+                    SyntaxKindGroups.ModifierKeywords.Contains(t.Value.Kind)
+                    || SyntaxKindGroups.KindsContainingParameterType.Contains(t.Value.Kind)
+                    || t.Value.Kind == SyntaxKind.AttributeList, // handles [Attribute] param
+                t => stopKinds.Contains(t.Value.Kind)
             )
             .FirstOrDefault();
+    }
+
+    // Optional DRY improvement (recommended) – replace the old method:
+    public static TreeNode<SemanticNode> FindNameAfterTypeBeforeSemicolon(
+        this TreeNode<SemanticNode> tree
+    )
+    {
+        var stopKinds = new HashSet<SyntaxKind> { SyntaxKind.SemicolonToken };
+        return tree.FindNameAfterType(stopKinds);
     }
 
     public static TreeNode<SemanticNode> FindParentByFullName(
@@ -1117,7 +1204,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
 
     public static string GetStaticClassName(this TreeNode<SemanticNode> node)
     {
-        return $"ExtensionsOf{node.GetStaticMethodThisParameterNameWithoutDelimeters()}";
+        return $"ExtensionsOf{node.GetStaticMethodThisParameterNameWithoutDelimiters()}";
     }
 
     public static List<UsingDirectiveNode> GetUsings(this TreeNode<SemanticNode> tree)
@@ -1420,22 +1507,32 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         File.WriteAllText(filePath, code);
     }
 
-    static string GetStaticMethodThisParameterNameWithoutDelimeters(
-        this TreeNode<SemanticNode> node
-    )
+    public static string GetStaticMethodThisParameterNameWithoutDelimiters(
+        this TreeNode<SemanticNode> node)
     {
-        var param = (ParameterNode)
-            node.FindWhere(t => t.Value is ParameterNode && ((ParameterNode)t.Value).IsThis)
-                .First()
-                .Value;
-        var typeText = param.TypeText.Replace("this", "").Trim();
+        var thisParam = node
+            .FindWhere(t => t.Value is ParameterNode p && p.IsThis)
+            .Select(t => (ParameterNode)t.Value)
+            .FirstOrDefault();
 
-        var lastDot = typeText.LastIndexOf('.');
+        if (thisParam == null || string.IsNullOrWhiteSpace(thisParam.TypeText))
+            throw new InvalidOperationException("Extension method must contain a 'this' parameter.");
+
+        string typeName = thisParam.TypeText.Trim();
+
+        // Remove namespace prefix (keep only the final type name)
+        int lastDot = typeName.LastIndexOf('.');
         if (lastDot >= 0)
-            typeText = typeText.Substring(lastDot + 1);
-        typeText = typeText.Replace("<", "Of");
-        var ret = Regex.Replace(typeText, @"[^a-zA-Z\d]", "");
-        return ret;
+            typeName = typeName.Substring(lastDot + 1);
+
+        // Convert generics and clean punctuation
+        typeName = typeName
+            .Replace("<", "Of")
+            .Replace(">", "")
+            .Replace(",", "");
+
+        // Final sanitization – keep only valid identifier characters
+        return Regex.Replace(typeName, @"[^a-zA-Z0-9]", "");
     }
 
     private static void MergeAtDepth(this TreeNode<SemanticNode> source, int index)
@@ -1537,23 +1634,18 @@ public static class ExtensionsOfTreeNodeOfTokenNode
 
 public class FieldNode : NamedMemberNode
 {
-    public FieldNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void SetNameNode()
     {
         NameNode = tree.FindNameAfterTypeBeforeSemicolon();
     }
+
+    public FieldNode(SyntaxElementNode b)
+        : base(b) { }
 }
 
 public class FileGen<T>
     where T : BaseNode<T>
 {
-    public FileGen(ISerializeCode<T> tree)
-    {
-        this.tree = tree;
-    }
-
     public static string ProjectLoadToCode(string projectFile)
     {
         throw new NotImplementedException();
@@ -1611,6 +1703,11 @@ public class FileGen<T>
         return ret;
     }
 
+    public FileGen(ISerializeCode<T> tree)
+    {
+        this.tree = tree;
+    }
+
     ISerializeCode<T> tree;
 }
 
@@ -1627,10 +1724,10 @@ public class ImplementTBD : NotImplementedException
 
 public class IndexerNode : ParameterizedMemberNode
 {
+    public override void SetNameNode() { }
+
     public IndexerNode(SyntaxElementNode b)
         : base(b) { }
-
-    public override void SetNameNode() { }
 }
 
 public class InterfaceNode : TypeDeclarationNode
@@ -1641,13 +1738,8 @@ public class InterfaceNode : TypeDeclarationNode
     protected override SyntaxKind? GetTypeSpecificKeyword() => SyntaxKind.InterfaceKeyword;
 }
 
-
-
 public class MethodNode : ParameterizedMemberWithBodyNode
 {
-    public MethodNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void SetNameNode()
     {
         this.NameNode = tree.FindSkipStop(
@@ -1657,6 +1749,9 @@ public class MethodNode : ParameterizedMemberWithBodyNode
             )
             .FirstOrDefault();
     }
+
+    public MethodNode(SyntaxElementNode b)
+        : base(b) { }
 
     public bool IsExtension =>
         ParameterList.Parameters.Count > 0 && ParameterList.Parameters.First().IsThis;
@@ -1757,12 +1852,6 @@ public abstract class NamedNode : SemanticNode
 
 public class NamespaceNode : TypeDeclarationNode
 {
-    public NamespaceNode(SyntaxElementNode b)
-        : base(b)
-    {
-        endDelimeter = new HashSet<SyntaxKind>() { SyntaxKind.OpenBraceToken };
-    }
-
     public override void AttachChild(SemanticNode child)
     {
         if (child is UsingDirectiveNode u)
@@ -1783,6 +1872,12 @@ public class NamespaceNode : TypeDeclarationNode
         this.SetName(endDelimeter);
     }
 
+    public NamespaceNode(SyntaxElementNode b)
+        : base(b)
+    {
+        endDelimeter = new HashSet<SyntaxKind>() { SyntaxKind.OpenBraceToken };
+    }
+
     public List<SemanticNode> Members { get; } = new();
     public List<UsingDirectiveNode> Usings { get; } = new();
 
@@ -1793,13 +1888,13 @@ public class NamespaceNode : TypeDeclarationNode
 
 public class OperatorNode : ParameterizedMemberWithBodyNode
 {
-    public OperatorNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void SetNameNode()
     {
         NameNode = FindOperatorToken();
     }
+
+    public OperatorNode(SyntaxElementNode b)
+        : base(b) { }
 
     TreeNode<SemanticNode> FindOperatorToken()
     {
@@ -1860,31 +1955,51 @@ public abstract class ParameterizedMemberWithBodyNode : ParameterizedMemberNode
 
 public class ParameterListNode : SemanticNode
 {
-    public ParameterListNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void AttachChild(SemanticNode child)
     {
         if (child is ParameterNode p)
             Parameters.Add(p);
     }
 
+    public ParameterListNode(SyntaxElementNode b)
+        : base(b) { }
+
     public List<ParameterNode> Parameters { get; } = new();
 }
 
+// ===================================================================
+// REPLACE THE ENTIRE ParameterNode CLASS with this improved version
+// ===================================================================
 public class ParameterNode : NamedNode
 {
-    public ParameterNode(SyntaxElementNode b)
-        : base(b) { }
-
-    public override void SetNameNode() { }
+    public override void SetNameNode()
+    {
+        // Now correctly finds the *name* even for complex types:
+        //   List<string> items
+        //   ref int x
+        //   params string[] args
+        //   [MyAttr] out int y = 42
+        var stopKinds = new HashSet<SyntaxKind>
+        {
+            SyntaxKind.CommaToken,
+            SyntaxKind.CloseParenToken,
+            SyntaxKind.EqualsToken, // default values
+        };
+        ParameterNameNode = tree.FindNameAfterType(stopKinds);
+    }
 
     public override void SetTreeNode(TreeNode<SemanticNode> t)
     {
-        base.SetTreeNode(t);
+        base.SetTreeNode(t); // sets NameNode via the override above
         ParseModifiers();
+        SetTypeNode();
         ParseType();
     }
+
+    public ParameterNode(SyntaxElementNode b)
+        : base(b) { }
+
+    public TreeNode<SemanticNode> ParameterNameNode;
 
     public bool IsIn => Modifiers.Contains(SyntaxKind.InKeyword);
     public bool IsOut => Modifiers.Contains(SyntaxKind.OutKeyword);
@@ -1893,10 +2008,17 @@ public class ParameterNode : NamedNode
     public bool IsThis => Modifiers.Contains(SyntaxKind.ThisKeyword);
 
     public List<SyntaxKind> Modifiers { get; } = new();
+
+    // ===================================================================
+    // NEW: Proper TypeNode (symmetric to NameNode used everywhere else)
+    // ===================================================================
+    public TreeNode<SemanticNode>? TypeNode { get; private set; }
+
     public string TypeText { get; private set; } = string.Empty;
 
     void ParseModifiers()
     {
+        Modifiers.Clear();
         Modifiers.AddRange(
             tree.FindWhere(t => SyntaxKindGroups.ModifierKeywords.Contains(t.Value.Kind))
                 .Select(t => t.Value.Kind)
@@ -1905,24 +2027,30 @@ public class ParameterNode : NamedNode
 
     void ParseType()
     {
-        var nameValues = tree.FindWhere(t => true)
-            .Where(t => t.Value != null && t.Value.Text != null)
-            .Select(t => t.Value.Text.Trim())
-            .Where(t => t != string.Empty)
-            .ToList();
-        TypeText = String.Join("", nameValues.Take(nameValues.Count - 1));
+        TypeText = TypeNode?.ToCode().Trim() ?? string.Empty;
+    }
+
+    private void SetTypeNode()
+    {
+        // The first (and usually only) top-level type node in the parameter subtree.
+        // KindsContainingParameterType already exists and covers every possible
+        // type form Roslyn can produce (generics, arrays, nullable, tuples, etc.).
+        TypeNode = tree.FindWhere(t =>
+                SyntaxKindGroups.KindsContainingParameterType.Contains(t.Value.Kind)
+            )
+            .FirstOrDefault();
     }
 }
 
 public class PropertyNode : NamedMemberNode
 {
-    public PropertyNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void SetNameNode()
     {
         NameNode = tree.FindNameAfterTypeBeforeSemicolon();
     }
+
+    public PropertyNode(SyntaxElementNode b)
+        : base(b) { }
 }
 
 public class RecordNode : TypeDeclarationNode
@@ -1935,9 +2063,6 @@ public class RecordNode : TypeDeclarationNode
 
 public class RegionEndNode : RegionNode
 {
-    public RegionEndNode(SyntaxElementNode b)
-        : base(b) { }
-
     public static TreeNode<SemanticNode> Factory()
     {
         var element = new SyntaxElementNode(SyntaxKind.EndRegionDirectiveTrivia, "\n#endregion\n");
@@ -1946,6 +2071,9 @@ public class RegionEndNode : RegionNode
         semantic.SetTreeNode(root);
         return root;
     }
+
+    public RegionEndNode(SyntaxElementNode b)
+        : base(b) { }
 }
 
 public abstract class RegionNode : TriviaNode
@@ -1964,15 +2092,6 @@ public abstract class RegionNode : TriviaNode
 
 public class RegionStartNode : RegionNode
 {
-    public RegionStartNode(SyntaxElementNode b)
-        : base(b) { }
-
-    public RegionStartNode(string name)
-        : base(new SyntaxElementNode(SyntaxKind.RegionDirectiveTrivia, $"\n#region {name}\n"))
-    {
-        this.Name = name;
-    }
-
     public static new TreeNode<SemanticNode> Factory(string regionName)
     {
         if (string.IsNullOrWhiteSpace(regionName))
@@ -1981,6 +2100,15 @@ public class RegionStartNode : RegionNode
         var element = new SyntaxElementNode(SyntaxKind.RegionDirectiveTrivia, text);
         var semantic = new RegionStartNode(element);
         return new TreeNode<SemanticNode>(semantic);
+    }
+
+    public RegionStartNode(SyntaxElementNode b)
+        : base(b) { }
+
+    public RegionStartNode(string name)
+        : base(new SyntaxElementNode(SyntaxKind.RegionDirectiveTrivia, $"\n#region {name}\n"))
+    {
+        this.Name = name;
     }
 
     public override string? Name { get; set; }
@@ -2036,7 +2164,7 @@ public abstract class SemanticNode : BaseNode<SemanticNode>
         get
         {
             var list = new List<string>() { ParentFullName, Name };
-            return string.Join(".", list.Where(t => !t.IsNullOrEmpty()));
+            return string.Join(".", list.Where(t => !String.IsNullOrEmpty(t)));
         }
     }
     public bool HasDirectNamedChildren
@@ -2230,9 +2358,6 @@ public class Serializer_TokenNode : ISerializeCode<TokenNode>
 
 public class SimpleMemberAccessNode : SemanticNode
 {
-    public SimpleMemberAccessNode(SyntaxElementNode b)
-        : base(b) { }
-
     public override void SetTreeNode(TreeNode<SemanticNode> tree)
     {
         base.SetTreeNode(tree);
@@ -2255,6 +2380,9 @@ public class SimpleMemberAccessNode : SemanticNode
         ValueNode = list.First();
         ValueNode.Value.Text = val;
     }
+
+    public SimpleMemberAccessNode(SyntaxElementNode b)
+        : base(b) { }
 
     public TreeNode<SemanticNode> ValueNode;
     public override string Value
@@ -2280,16 +2408,6 @@ public class StructNode : TypeDeclarationNode
 
 public class SyntaxElementNode : BaseNode<SyntaxElementNode>
 {
-    public SyntaxElementNode(SyntaxKind kind, string text)
-        : this(kind, text, null) { }
-
-    public SyntaxElementNode(SyntaxKind kind, string text, string identifier)
-    {
-        Kind = kind;
-        Text = text;
-        Identifier = identifier;
-    }
-
     public SemanticNode CreateSemantic()
     {
         return Kind switch
@@ -2337,6 +2455,16 @@ public class SyntaxElementNode : BaseNode<SyntaxElementNode>
         if (Identifier is { } id)
             sb.Append($"({id})");
         return sb.ToString();
+    }
+
+    public SyntaxElementNode(SyntaxKind kind, string text)
+        : this(kind, text, null) { }
+
+    public SyntaxElementNode(SyntaxKind kind, string text, string identifier)
+    {
+        Kind = kind;
+        Text = text;
+        Identifier = identifier;
     }
 
     public string? Identifier { get; }
@@ -2665,8 +2793,6 @@ public class SyntaxKindGroups
 
 public class SyntaxLoader : IDisposable
 {
-    public SyntaxLoader() { }
-
     public static MSBuildWorkspace CreateWorkspace()
     {
         var msbuildProps = new Dictionary<string, string>
@@ -2737,6 +2863,8 @@ public class SyntaxLoader : IDisposable
         return ret;
     }
 
+    public SyntaxLoader() { }
+
     static SyntaxLoader()
     {
         MSBuildLocator.RegisterDefaults();
@@ -2745,32 +2873,6 @@ public class SyntaxLoader : IDisposable
 
 public partial class TokenNode : BaseNode<TokenNode>
 {
-    public TokenNode(SyntaxNodeOrToken node)
-    {
-        Kind = node.Kind();
-        if (node.IsToken)
-        {
-            var token = node.AsToken();
-            Text = token.Text;
-            if (token.IsKind(SyntaxKind.IdentifierToken))
-                Identifier = token.Text;
-
-            LeadingTrivia = token
-                .LeadingTrivia.Select(t => new SyntaxElementNode(t.Kind(), t.ToFullString()))
-                .ToList()
-                .AsReadOnly();
-
-            TrailingTrivia = token
-                .TrailingTrivia.Select(t => new SyntaxElementNode(t.Kind(), t.ToFullString()))
-                .ToList()
-                .AsReadOnly();
-        }
-        else
-        {
-            OriginalSyntaxNode = node.AsNode();
-        }
-    }
-
     public SyntaxElementNode? GetFullTrivia(int index, bool isLeading = true)
     {
         var list = isLeading ? LeadingTrivia : TrailingTrivia;
@@ -2811,6 +2913,32 @@ public partial class TokenNode : BaseNode<TokenNode>
         return elements;
     }
 
+    public TokenNode(SyntaxNodeOrToken node)
+    {
+        Kind = node.Kind();
+        if (node.IsToken)
+        {
+            var token = node.AsToken();
+            Text = token.Text;
+            if (token.IsKind(SyntaxKind.IdentifierToken))
+                Identifier = token.Text;
+
+            LeadingTrivia = token
+                .LeadingTrivia.Select(t => new SyntaxElementNode(t.Kind(), t.ToFullString()))
+                .ToList()
+                .AsReadOnly();
+
+            TrailingTrivia = token
+                .TrailingTrivia.Select(t => new SyntaxElementNode(t.Kind(), t.ToFullString()))
+                .ToList()
+                .AsReadOnly();
+        }
+        else
+        {
+            OriginalSyntaxNode = node.AsNode();
+        }
+    }
+
     public string? Identifier { get; }
 
     public SyntaxKind Kind { get; }
@@ -2828,11 +2956,6 @@ public partial class TokenNode : BaseNode<TokenNode>
 public partial class TreeNode<T>
     where T : BaseNode<T>
 {
-    public TreeNode(T? value)
-    {
-        Value = value;
-    }
-
     public TreeNode<T> AddChild(T child)
     {
         var ret = new TreeNode<T>(child);
@@ -3115,6 +3238,11 @@ public partial class TreeNode<T>
         return Value?.ToString() ?? string.Empty;
     }
 
+    public TreeNode(T? value)
+    {
+        Value = value;
+    }
+
     public List<TreeNode<T>> Children
     {
         get { return _children; }
@@ -3167,10 +3295,10 @@ public abstract class TypeDeclarationNode : NamedMemberNode
         get { return this.tree.Children[1]; }
     }
 
+    protected abstract SyntaxKind? GetTypeSpecificKeyword();
+
     protected TypeDeclarationNode(SyntaxElementNode b)
         : base(b) { }
-
-    protected abstract SyntaxKind? GetTypeSpecificKeyword();
 
     void SetBaseList()
     {
@@ -3205,16 +3333,16 @@ public class UnknownNode : SemanticNode
 
 public class UsingDirectiveNode : NamedNode
 {
+    public override void SetNameNode()
+    {
+        SetName(endDelimeter);
+    }
+
     public UsingDirectiveNode(SyntaxElementNode b)
         : base(b)
     {
         this.endDelimeter = new HashSet<SyntaxKind> { SyntaxKind.SemicolonToken };
         Modifier = AccessModifier.Public;
-    }
-
-    public override void SetNameNode()
-    {
-        SetName(endDelimeter);
     }
 }
 
@@ -3254,6 +3382,7 @@ public enum SyntaxKindOrdering
 {
     UsingDirective,
     FileScopedNamespaceDeclaration,
+    MethodDeclaration,
     ClassDeclaration,
     NamespaceDeclaration,
     InterfaceDeclaration,
@@ -3262,7 +3391,7 @@ public enum SyntaxKindOrdering
     StructDeclaration,
     DelegateDeclaration,
     ConstructorDeclaration,
-    MethodDeclaration,
+
     FieldDeclaration,
     EventFieldDeclaration,
     DestructorDeclaration,
@@ -3286,23 +3415,8 @@ public enum SyntaxKindOrdering
 
 public partial record ProjectPaths
 {
-    public ProjectPaths(string baseNamespace, string root_directory)
-    {
-        this.root_directory = root_directory;
-        if (string.IsNullOrWhiteSpace(baseNamespace))
-            throw new ArgumentException("Base namespace cannot be empty.", nameof(baseNamespace));
-
-        BaseNamespace = baseNamespace.Trim();
-
-        ProjectFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}.csproj");
-        ConsolidatedFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}.cs");
-        TestFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_test.cs");
-        ClassFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Class_Prefix}.cs");
-        MethodFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Method_Prefix}.cs");
-    }
-
-    public static ProjectPaths Create(string baseNamespace, string rootDir) =>
-        new(baseNamespace, rootDir);
+    public static ProjectPaths Create(string baseNamespace) =>
+        new(baseNamespace);
 
     // ==================== All Core Methods ====================
     public void FlattenClassesOutOfNamespaces()
@@ -3320,9 +3434,12 @@ public partial record ProjectPaths
         File.WriteAllText(ConsolidatedFilePath, code);
     }
 
-    public string GetFilePath(string name)
+    public string GetFilePath(string name,string subdir)
     {
-        return Path.Combine(RootDirectory, $"{BaseNamespace}_{name}.cs");
+        if (!String.IsNullOrEmpty(subdir))
+            subdir = $@"{subdir}\";
+        var ret=Path.Combine(RootDirectory, $"{subdir}{BaseNamespace}_{name}.cs");
+        return ret;
     }
 
     public string GetTestFilePath(int i)
@@ -3362,9 +3479,10 @@ public partial record ProjectPaths
         return LoadTree(ConsolidatedFilePath);
     }
 
-    public TreeNode<SemanticNode> LoadTree(string file)
+    public TreeNode<SemanticNode> LoadTree(string name,string subdir=null)
     {
-        var tree = SemanticTree.DeserializeFile(file);
+        var loadFile = GetFilePath(name,subdir);
+        var tree = SemanticTree.DeserializeFile(loadFile);
         tree = tree.GroupConsecutiveChildren(t => t.Value.HasName);
         return tree;
     }
@@ -3420,6 +3538,24 @@ public partial record ProjectPaths
             ["One-namespace-per-file ns"] = OneNamespacePerFileNamespace,
         };
 
+    public ProjectPaths(string baseNamespace, string root_directory=null)
+    {
+        if (root_directory == null)
+            root_directory = AppDomain.CurrentDomain.GetSolutionBaseFolder();
+        this.root_directory = root_directory;
+
+        if (string.IsNullOrWhiteSpace(baseNamespace))
+            throw new ArgumentException("Base namespace cannot be empty.", nameof(baseNamespace));
+
+        BaseNamespace = baseNamespace.Trim();
+
+        ProjectFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}.csproj");
+        ConsolidatedFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}.cs");
+        TestFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_test.cs");
+        ClassFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Class_Prefix}.cs");
+        MethodFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Method_Prefix}.cs");
+    }
+
     public static string Class_Prefix = "Class";
     public static string Consolidated_Prefix = "";
     public static string Method_Prefix = "Method";
@@ -3439,7 +3575,7 @@ public partial record ProjectPaths
         $"{BaseNamespace}.{OneNamespacePerFileNamespaceSuffix}";
     public string OneNamespacePerFileNamespaceSuffix => one_namespace_per_file_namespace;
     public string ProjectFilePath { get; }
-    public virtual string RootDirectory => $@"{root_directory}{BaseNamespace}";
+    public virtual string RootDirectory => Path.Combine(root_directory,BaseNamespace);
     public string TestFilePath { get; }
 
     // ==================== Private Helpers & Constants ====================
