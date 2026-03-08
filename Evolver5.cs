@@ -1967,9 +1967,7 @@ public class ParameterListNode : SemanticNode
     public List<ParameterNode> Parameters { get; } = new();
 }
 
-// ===================================================================
-// REPLACE THE ENTIRE ParameterNode CLASS with this improved version
-// ===================================================================
+
 public class ParameterNode : NamedNode
 {
     public override void SetNameNode()
