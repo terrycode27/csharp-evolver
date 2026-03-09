@@ -29,9 +29,7 @@ public class __Program
 {
     public static void Main()
     {
-        // MergeTest();
-        var path = KnownProjectPaths.Evolver5;
-        path.GroupStaticExtensionMethods();
+        MergeTest();
         SelfTest();
     }
 
@@ -449,6 +447,35 @@ public static class ExtensionsOfAppDomain
 
 public static class ExtensionsOfIEnumerableOfT
 {
+
+    public static void ForEach<T>(this IEnumerable<T> source, Action<T> action)
+    {
+        if (source == null)
+            throw new ArgumentNullException(nameof(source));
+        if (action == null)
+            throw new ArgumentNullException(nameof(action));
+        foreach (var item in source)
+            action(item);
+    }
+
+    public static IEnumerable<T> GroupByPredicates<T>(
+        this IEnumerable<T> items,
+        List<Func<T, object>> predicates
+    )
+    {
+        IEnumerable<T> ApplyGrouping(int index, IEnumerable<T> currentItems)
+        {
+            if (index >= predicates.Count)
+                return currentItems;
+
+            return currentItems
+                .GroupBy(predicates[index])
+                .OrderBy(g => g.Key)
+                .SelectMany(g => ApplyGrouping(index + 1, g));
+        }
+
+        return ApplyGrouping(0, items);
+    }
     public static List<List<T>> GroupConsecutive<T>(
         this IEnumerable<T> items,
         Func<T, bool> predicate
@@ -473,50 +500,18 @@ public static class ExtensionsOfIEnumerableOfT
 
         return result;
     }
-
-    public static IEnumerable<T> GroupByPredicates<T>(
-        this IEnumerable<T> items,
-        List<Func<T, object>> predicates
-    )
-    {
-        IEnumerable<T> ApplyGrouping(int index, IEnumerable<T> currentItems)
-        {
-            if (index >= predicates.Count)
-                return currentItems;
-
-            return currentItems
-                .GroupBy(predicates[index])
-                .OrderBy(g => g.Key)
-                .SelectMany(g => ApplyGrouping(index + 1, g));
-        }
-
-        return ApplyGrouping(0, items);
-    }
-
-    public static void ForEach<T>(this IEnumerable<T> source, Action<T> action)
-    {
-        if (source == null)
-            throw new ArgumentNullException(nameof(source));
-        if (action == null)
-            throw new ArgumentNullException(nameof(action));
-        foreach (var item in source)
-            action(item);
-    }
 }
 
 public static class ExtensionsOfIEnumerableOfTreeNodeOfSemanticNode
 {
-    public static Dictionary<string, TreeNode<SemanticNode>> ToDictionaryByFullName(
-        this IEnumerable<TreeNode<SemanticNode>> nodes
-    ) => nodes.ToDictionary(t => t.Value.FullName);
 
-    public static List<TreeNode<SemanticNode>> NotPresentIn(
-        this IEnumerable<TreeNode<SemanticNode>> candidates,
-        IEnumerable<TreeNode<SemanticNode>> existing
+    public static IEnumerable<TreeNode<SemanticNode>> DeleteKind(
+        this IEnumerable<TreeNode<SemanticNode>> en,
+        SyntaxKind kind,
+        DeleteType deleteType = DeleteType.SingleNode
     )
     {
-        var existingNames = existing.Select(e => e.Value.FullName).ToHashSet();
-        return candidates.Where(c => !existingNames.Contains(c.Value.FullName)).ToList();
+        return en.DeleteKinds(new HashSet<SyntaxKind>() { kind }, deleteType);
     }
 
     public static IEnumerable<TreeNode<SemanticNode>> DeleteKinds(
@@ -532,14 +527,17 @@ public static class ExtensionsOfIEnumerableOfTreeNodeOfSemanticNode
         }
     }
 
-    public static IEnumerable<TreeNode<SemanticNode>> DeleteKind(
-        this IEnumerable<TreeNode<SemanticNode>> en,
-        SyntaxKind kind,
-        DeleteType deleteType = DeleteType.SingleNode
+    public static List<TreeNode<SemanticNode>> NotPresentIn(
+        this IEnumerable<TreeNode<SemanticNode>> candidates,
+        IEnumerable<TreeNode<SemanticNode>> existing
     )
     {
-        return en.DeleteKinds(new HashSet<SyntaxKind>() { kind }, deleteType);
+        var existingNames = existing.Select(e => e.Value.FullName).ToHashSet();
+        return candidates.Where(c => !existingNames.Contains(c.Value.FullName)).ToList();
     }
+    public static Dictionary<string, TreeNode<SemanticNode>> ToDictionaryByFullName(
+        this IEnumerable<TreeNode<SemanticNode>> nodes
+    ) => nodes.ToDictionary(t => t.Value.FullName);
 }
 
 public static class ExtensionsOfIEnumerableOfTSource
@@ -579,76 +577,6 @@ public static class ExtensionsOfListOfT
 
 public static class ExtensionsOfListOfTreeNodeOfSemanticNode
 {
-    public static TreeNode<SemanticNode> WrapInDeclaration(
-        this List<TreeNode<SemanticNode>> methods,
-        string declaration
-    )
-    {
-        var root = SemanticTree.DeserializeCode(declaration);
-        var body = root.FindWhere(t => t.Value.Kind == SyntaxKind.OpenBraceToken).First();
-        foreach (var m in methods.OrderBy(m => m.Value.Name))
-        {
-            m.RemoveSelf();
-            body.InsertAfter(m);
-        }
-        root = root.GroupConsecutiveChildren(t => t.Value.HasName);
-        return root.Children.First();
-    }
-
-    public static List<TreeNode<SemanticNode>> SortedByModifierKindName(
-        this List<TreeNode<SemanticNode>> children
-    ) =>
-        children
-            .OrderBy(t => t.Value.Modifier)
-            .ThenBy(t => t.Value.Kind.ToHandled())
-            .ThenBy(t => t.Value.Name ?? "")
-            .ToList();
-
-    public static void SetStaticExtensionMethodsPublic(
-        this List<TreeNode<SemanticNode>> extensionMethods
-    )
-    {
-        var casted = extensionMethods.Select(t => (MethodNode)t.Value).ToList();
-        var privateMethods = casted.Where(t => t.Modifier == AccessModifier.Private).ToList();
-        foreach (var p in privateMethods)
-        {
-            p.Modifier = AccessModifier.Public;
-        }
-    }
-
-    public static List<List<TreeNode<SemanticNode>>> GroupedByModifierKind(
-        this List<TreeNode<SemanticNode>> children
-    ) =>
-        children
-            .GroupBy(t => new { t.Value.Modifier, Kind = t.Value.Kind.ToHandled() })
-            .Select(g => g.ToList())
-            .ToList();
-
-    public static List<string> GetStrings(this List<TreeNode<SemanticNode>> en)
-    {
-        return en.Select(t => t.Value.Text.Trim()).ToList();
-    }
-
-    public static IEnumerable<TreeNode<SemanticNode>> FindText(
-        this List<TreeNode<SemanticNode>> roots,
-        HashSet<SyntaxKind> include,
-        HashSet<SyntaxKind> stopAt
-    )
-    {
-        return roots
-            .FindWhereStop(t => include.Contains(t.Value.Kind), t => stopAt.Contains(t.Value.Kind))
-            .Where(t => t.Value != null && t.Value.Text != null && t.Value.Text != string.Empty)
-            .ToList();
-    }
-
-    public static IEnumerable<TreeNode<SemanticNode>> FindDelimitedText(
-        this List<TreeNode<SemanticNode>> roots,
-        HashSet<SyntaxKind> delimeters
-    )
-    {
-        var include = new HashSet<SyntaxKind> { SyntaxKind.DotToken, SyntaxKind.IdentifierToken };
-        return roots.FindText(include, delimeters);
-    }
 
     public static TreeNode<SemanticNode> CreateNewPartialClassForInterface(
         this List<TreeNode<SemanticNode>> methodsToMove,
@@ -678,44 +606,100 @@ public static class ExtensionsOfListOfTreeNodeOfSemanticNode
         newPartialClass.InitializeAllNodes();
         return newPartialClass;
     }
+
+    public static IEnumerable<TreeNode<SemanticNode>> FindDelimitedText(
+        this List<TreeNode<SemanticNode>> roots,
+        HashSet<SyntaxKind> delimeters
+    )
+    {
+        var include = new HashSet<SyntaxKind> { SyntaxKind.DotToken, SyntaxKind.IdentifierToken };
+        return roots.FindText(include, delimeters);
+    }
+
+    public static IEnumerable<TreeNode<SemanticNode>> FindText(
+        this List<TreeNode<SemanticNode>> roots,
+        HashSet<SyntaxKind> include,
+        HashSet<SyntaxKind> stopAt
+    )
+    {
+        return roots
+            .FindWhereStop(t => include.Contains(t.Value.Kind), t => stopAt.Contains(t.Value.Kind))
+            .Where(t => t.Value != null && t.Value.Text != null && t.Value.Text != string.Empty)
+            .ToList();
+    }
+
+    public static List<string> GetStrings(this List<TreeNode<SemanticNode>> en)
+    {
+        return en.Select(t => t.Value.Text.Trim()).ToList();
+    }
+
+    public static List<List<TreeNode<SemanticNode>>> GroupedByModifierKind(
+        this List<TreeNode<SemanticNode>> children
+    ) =>
+        children
+            .GroupBy(t => new { t.Value.Modifier, Kind = t.Value.Kind.ToHandled() })
+            .Select(g => g.ToList())
+            .ToList();
+
+    public static void SetStaticExtensionMethodsPublic(
+        this List<TreeNode<SemanticNode>> extensionMethods
+    )
+    {
+        var casted = extensionMethods.Select(t => (MethodNode)t.Value).ToList();
+        var privateMethods = casted.Where(t => t.Modifier == AccessModifier.Private).ToList();
+        foreach (var p in privateMethods)
+        {
+            p.Modifier = AccessModifier.Public;
+        }
+    }
+
+    public static List<TreeNode<SemanticNode>> SortedByModifierKindName(
+        this List<TreeNode<SemanticNode>> children
+    ) =>
+        children
+            .OrderBy(t => t.Value.Modifier)
+            .ThenBy(t => t.Value.Kind.ToHandled())
+            .ThenBy(t => t.Value.Name ?? "")
+            .ToList();
+    public static TreeNode<SemanticNode> WrapInDeclaration(
+        this List<TreeNode<SemanticNode>> methods,
+        string declaration
+    )
+    {
+        var root = SemanticTree.DeserializeCode(declaration);
+        var body = root.FindWhere(t => t.Value.Kind == SyntaxKind.OpenBraceToken).First();
+        foreach (var m in methods.OrderBy(m => m.Value.Name))
+        {
+            m.RemoveSelf();
+            body.InsertAfter(m);
+        }
+        root = root.GroupConsecutiveChildren(t => t.Value.HasName);
+        return root.Children.First();
+    }
 }
 
 public static class ExtensionsOfListOfTreeNodeOfT
 {
-    public static IEnumerable<TreeNode<T>> FindWhereStop<T>(
+
+    public static IEnumerable<TreeNode<T>> FindSkip<T>(
         this List<TreeNode<T>> roots,
         Func<TreeNode<T>, bool> predicate,
-        Func<TreeNode<T>, bool> untilPredicate
+        Func<TreeNode<T>, bool> skipPredicate
     )
         where T : BaseNode<T>
     {
-        if (roots == null || predicate == null || untilPredicate == null)
-            yield break;
-        foreach (var f in roots.FindWhere(t => true))
-        {
-            if (untilPredicate(f))
-                yield break;
-            if (predicate(f))
-                yield return f;
-        }
-    }
-
-    public static IEnumerable<TreeNode<T>> FindWhere<T>(
-        this List<TreeNode<T>> roots,
-        Func<TreeNode<T>, bool> predicate
-    )
-        where T : BaseNode<T>
-    {
-        if (roots == null || predicate == null)
+        if (roots == null || predicate == null || skipPredicate == null)
             yield break;
         foreach (var root in roots)
         {
             if (root == null)
                 continue;
-            if (root.Value != null && predicate(root))
+            if (skipPredicate(root))
+                continue;
+            if (predicate(root))
                 yield return root;
-            foreach (var found in root.Children.FindWhere(predicate))
-                yield return found;
+            foreach (var result in root.Children.FindSkip(predicate, skipPredicate))
+                yield return result;
         }
     }
 
@@ -746,35 +730,45 @@ public static class ExtensionsOfListOfTreeNodeOfT
         }
     }
 
-    public static IEnumerable<TreeNode<T>> FindSkip<T>(
+    public static IEnumerable<TreeNode<T>> FindWhere<T>(
         this List<TreeNode<T>> roots,
-        Func<TreeNode<T>, bool> predicate,
-        Func<TreeNode<T>, bool> skipPredicate
+        Func<TreeNode<T>, bool> predicate
     )
         where T : BaseNode<T>
     {
-        if (roots == null || predicate == null || skipPredicate == null)
+        if (roots == null || predicate == null)
             yield break;
         foreach (var root in roots)
         {
             if (root == null)
                 continue;
-            if (skipPredicate(root))
-                continue;
-            if (predicate(root))
+            if (root.Value != null && predicate(root))
                 yield return root;
-            foreach (var result in root.Children.FindSkip(predicate, skipPredicate))
-                yield return result;
+            foreach (var found in root.Children.FindWhere(predicate))
+                yield return found;
+        }
+    }
+    public static IEnumerable<TreeNode<T>> FindWhereStop<T>(
+        this List<TreeNode<T>> roots,
+        Func<TreeNode<T>, bool> predicate,
+        Func<TreeNode<T>, bool> untilPredicate
+    )
+        where T : BaseNode<T>
+    {
+        if (roots == null || predicate == null || untilPredicate == null)
+            yield break;
+        foreach (var f in roots.FindWhere(t => true))
+        {
+            if (untilPredicate(f))
+                yield break;
+            if (predicate(f))
+                yield return f;
         }
     }
 }
 
 public static class ExtensionsOfstring
 {
-    public static TreeNode<SemanticNode> ToTree(this string code)
-    {
-        return SemanticTree.DeserializeCode(code);
-    }
 
     public static string NormalizeLineEndings(this string text)
     {
@@ -783,21 +777,14 @@ public static class ExtensionsOfstring
 
         return text.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n");
     }
+    public static TreeNode<SemanticNode> ToTree(this string code)
+    {
+        return SemanticTree.DeserializeCode(code);
+    }
 }
 
 public static class ExtensionsOfSyntaxKind
 {
-    public static AccessModifier ToModifier(this SyntaxKind kind)
-    {
-        return kind switch
-        {
-            SyntaxKind.PublicKeyword => AccessModifier.Public,
-            SyntaxKind.ProtectedKeyword => AccessModifier.Protected,
-            SyntaxKind.InternalKeyword => AccessModifier.Internal,
-            SyntaxKind.PrivateKeyword => AccessModifier.Private,
-            _ => throw new NotImplementedException(),
-        };
-    }
 
     public static SyntaxKindOrdering ToHandled(this SyntaxKind kind)
     {
@@ -836,10 +823,27 @@ public static class ExtensionsOfSyntaxKind
             _ => SyntaxKindOrdering.Unknown,
         };
     }
+    public static AccessModifier ToModifier(this SyntaxKind kind)
+    {
+        return kind switch
+        {
+            SyntaxKind.PublicKeyword => AccessModifier.Public,
+            SyntaxKind.ProtectedKeyword => AccessModifier.Protected,
+            SyntaxKind.InternalKeyword => AccessModifier.Internal,
+            SyntaxKind.PrivateKeyword => AccessModifier.Private,
+            _ => throw new NotImplementedException(),
+        };
+    }
 }
 
 public static class ExtensionsOfSyntaxNode
 {
+
+    public static TreeNode<SemanticNode> ToTreeSemanticNode(this SyntaxNode node)
+    {
+        var ret = node.ToTreeTokenNode().ToTreeSyntaxElement().ToTreeSemanticNode();
+        return ret;
+    }
     public static TreeNode<TokenNode> ToTreeTokenNode(this SyntaxNode node)
     {
         var current = new TreeNode<TokenNode>(new TokenNode(node));
@@ -863,24 +867,25 @@ public static class ExtensionsOfSyntaxNode
 
         return current;
     }
-
-    public static TreeNode<SemanticNode> ToTreeSemanticNode(this SyntaxNode node)
-    {
-        var ret = node.ToTreeTokenNode().ToTreeSyntaxElement().ToTreeSemanticNode();
-        return ret;
-    }
 }
 
 public static class ExtensionsOfT
 {
-    public static IEnumerable<T> Yield<T>(this T item)
-    {
-        yield return item;
-    }
 
-    public static List<T> ToSingletonList<T>(this T item)
+    public static T[] AsArray<T>(this T item)
     {
         return [item];
+    }
+
+    public static List<T> AsList<T>(this T item)
+    {
+        return [item];
+    }
+
+    public static List<T> AsListOrEmpty<T>(this T? item)
+        where T : class
+    {
+        return item is null ? [] : [item];
     }
 
     public static Queue<T> AsQueue<T>(this T item)
@@ -890,505 +895,448 @@ public static class ExtensionsOfT
         return queue;
     }
 
-    public static List<T> AsListOrEmpty<T>(this T? item)
-        where T : class
-    {
-        return item is null ? [] : [item];
-    }
-
-    public static List<T> AsList<T>(this T item)
+    public static List<T> ToSingletonList<T>(this T item)
     {
         return [item];
     }
-
-    public static T[] AsArray<T>(this T item)
+    public static IEnumerable<T> Yield<T>(this T item)
     {
-        return [item];
+        yield return item;
     }
 }
 
 public static class ExtensionsOfTreeNodeOfSemanticNode
 {
-    public static void ToFormattedFile(this TreeNode<SemanticNode> node, string filePath)
-    {
-        var code = node.ToCode();
-        code = CSharpierFormatter.Format(code);
-        File.WriteAllText(filePath, code);
-    }
 
-    public static void ToFile(this TreeNode<SemanticNode> node, string filePath)
-    {
-        var code = node.ToCode();
-        code = code.NormalizeLineEndings();
-        File.WriteAllText(filePath, code);
-    }
-
-    public static string ToCode(this TreeNode<SemanticNode> node)
-    {
-        var code = node.Serialize();
-        return code;
-    }
-
-    public static bool TestCompile(
-        this TreeNode<SemanticNode> node,
-        string projectPath,
-        string savePath = null
+    public static void AddMissingContainersAtDepth(
+        this TreeNode<SemanticNode> destination,
+        TreeNode<SemanticNode> source,
+        int depth
     )
     {
-        var code = node.ToCode();
+        var missing = source
+            .GetNamedNodesAtDepth(depth)
+            .Where(t => !t.Value.ChildOnly)
+            .NotPresentIn(destination.GetNamedNodes());
 
-        if (savePath != null)
-            File.WriteAllText(savePath, code);
-        var ret = CompilationUtil.Compile(code, projectPath);
-        if (!ret.Success)
-            throw new Exception("FAILURE");
-        return ret.Success;
-    }
-
-    public static bool ShouldDivideLargeClass(this TreeNode<SemanticNode> tree)
-    {
-        if (tree == null || tree.Value is not ClassNode classNode)
-            return false;
-
-        string className = classNode.Name ?? "Unknown";
-
-        int methodCount = tree.CountMethods();
-        int locCount = tree.CountLinesOfCode();
-
-        const int METHOD_THRESHOLD = 12;
-        const int LOC_THRESHOLD = 320;
-
-        bool isLarge = methodCount >= METHOD_THRESHOLD || locCount >= LOC_THRESHOLD;
-
-        return isLarge;
-    }
-
-    public static void SerializeFile(this TreeNode<SemanticNode> node, string filePath)
-    {
-        node.ToFile(filePath);
-    }
-
-    public static string Serialize(this TreeNode<SemanticNode>? root)
-    {
-        if (root == null)
-            return string.Empty;
-        var sb = new StringBuilder(8192 * 8);
-
-        void Visit(TreeNode<SemanticNode> node)
+        foreach (var node in missing)
         {
-            if (node.Value?.Text != null)
-                sb.Append(node.Value.Text);
-            foreach (var child in node.Children)
-                Visit(child);
+            var parent = destination.FindParentByFullName(node.Value.ParentFullName);
+            parent.Value.MembersNode.AddChild(node);
         }
-
-        Visit(root);
-        return sb.ToString();
     }
 
-    public static void SaveFile(this TreeNode<SemanticNode> node, string filePath)
-    {
-        node.SerializeFile(filePath);
-    }
-
-    public static List<TreeNode<SemanticNode>> ReplaceExistingLowestLevelTypesFrom(
+    public static void AddMissingContainersByDepthFrom(
         this TreeNode<SemanticNode> destination,
         TreeNode<SemanticNode> source
     )
     {
-        var destByName = destination.GetLowestLevelTypes().ToDictionaryByFullName();
-        var newLowLevelTypes = new List<TreeNode<SemanticNode>>();
-        var sourceTypes = source.GetLowestLevelTypes();
-        foreach (var sourceNode in sourceTypes)
-        {
-            if (destByName.TryGetValue(sourceNode.Value.FullName, out var destNode))
-                destNode.ReplaceSelf(sourceNode);
-            else
-                newLowLevelTypes.Add(sourceNode);
-        }
+        var maxDepth = source.GetMaxParentCount();
 
-        return newLowLevelTypes;
+        for (int depth = 0; depth <= maxDepth; depth++)
+            destination.AddMissingContainersAtDepth(source, depth);
     }
 
-    public static void RenameNamespaces(
-        this TreeNode<SemanticNode> tree,
-        Func<string, string> replace
+    public static void AddNewLowestLevelTypesFrom(
+        this TreeNode<SemanticNode> destination,
+        List<TreeNode<SemanticNode>> source
     )
     {
-        var namespaces = tree
-            .Children.Where(t => t.Value.Kind == SyntaxKind.NamespaceDeclaration)
-            .ToList();
-        namespaces.ForEach(t =>
+        foreach (var sourceNode in source)
         {
-            t.Value.Name = replace(t.Value.Name);
-        });
-        var usings = tree.Children.Where(t => t.Value.Kind == SyntaxKind.UsingDirective).ToList();
-        usings.ForEach(t => t.Value.Name = replace(t.Value.Name));
-        usings
-            .GroupBy(t => t.Value.Name)
-            .Where(t => t.Count() > 1)
-            .SelectMany(t => t.Skip(1))
-            .ForEach(t => t.Delete(DeleteType.NodeAndSubTree));
-    }
-
-    public static TreeNode<SemanticNode> RemoveNamespaces(this TreeNode<SemanticNode> tree)
-    {
-        var ns = tree.FindWhere(t => t.Value.Kind == SyntaxKind.NamespaceDeclaration).ToList();
-        ns.ForEach(t =>
-        {
-            t.Value.DeleteDeclaration();
-        });
-        return tree;
-    }
-
-    public static void RemoveEmptyClasses(this TreeNode<SemanticNode> node)
-    {
-        var classes = node.FindClasses().Where(t => t.IsStaticClass).ToList();
-        var emptyClasses = classes.Where(t => !t.HasMethods).ToList();
-        foreach (var e in emptyClasses) { }
-
-        emptyClasses.ForEach(t => t.tree.RemoveSelf());
-    }
-
-    public static TreeNode<SemanticNode> ReloadFormatted(this TreeNode<SemanticNode> node)
-    {
-        var code = node.ToCode();
-        code = CSharpierFormatter.Format(code);
-        var ret = SemanticTree.DeserializeCode(code);
-        ret.GroupConsecutiveChildren(t => t.Value.HasName);
-        return ret;
-    }
-
-    public static void PullChildrenOutOfNamespaces(this TreeNode<SemanticNode> root)
-    {
-        var namespaces = root.FindWhere(t => t.Value.Kind == SyntaxKind.NamespaceDeclaration)
-            .ToList();
-        var usings = root.FindWhere(t => t.Value.Kind == SyntaxKind.UsingDirective).ToList();
-        foreach (var ns in namespaces)
-        {
-            root.PullChildrenOutOfNamespace(usings, ns);
+            var parentFullName = sourceNode.Value.ParentFullName;
+            var targetParent = destination.FindParentByFullName(parentFullName);
+            targetParent.AddNewMember(sourceNode);
         }
     }
 
-    public static void PullChildrenOutOfNamespace(
-        this TreeNode<SemanticNode> root,
-        List<TreeNode<SemanticNode>> usings,
-        TreeNode<SemanticNode> ns
+    public static void AddNewMember(
+        this TreeNode<SemanticNode> parent,
+        TreeNode<SemanticNode> member
     )
     {
-        var types = ns.FindSyntaxKinds(SyntaxKindGroups.NamespaceTypeChildren).ToList();
-        ns.RemoveSelf();
-        var nsUsing = usings.Where(t => t.Value.Name == ns.Value.Name).FirstOrDefault();
-        nsUsing.RemoveSelf();
-        root.Children.AddRange(types);
+        if (member.Value.Name == "b")
+        {
+            int bp = 0;
+        }
+        parent.Value.MembersNode.AddChild(member);
     }
 
-    public static TreeNode<SemanticNode> OrderCollectionValues(
-        this TreeNode<SemanticNode> originalTree
+    public static bool AlreadyHasPartialKeyword(this TreeNode<SemanticNode> classObj) =>
+        classObj.FindWhere(t => t.Value.Kind == SyntaxKind.PartialKeyword).Any();
+
+    public static List<string> AsCode<T>(this TreeNode<SemanticNode> tree)
+    {
+        var list = tree.Flatten().Select(t => t.ToCode()).ToList();
+        return list;
+    }
+
+    public static TreeNode<SemanticNode> BuildRegionTree(
+        this TreeNode<SemanticNode> classNode,
+        Dictionary<string, List<TreeNode<SemanticNode>>> derivedMap,
+        Dictionary<string, TreeNode<SemanticNode>> byName
     )
+    {
+        var className = ((ClassNode)classNode.Value).Name;
+        var region = RegionStartNode.Factory(className);
+        region.AddChild(classNode);
+
+        if (derivedMap.TryGetValue(className, out var children))
+        {
+            children
+                .OrderBy(c => ((ClassNode)c.Value).Name)
+                .Select(c => BuildRegionTree(c, derivedMap, byName))
+                .ToList()
+                .ForEach(region.AddChild);
+        }
+
+        region.AddChild(RegionEndNode.Factory());
+        return region;
+    }
+
+    public static int CountLinesOfCode(this TreeNode<SemanticNode> tree)
+    {
+        if (tree == null)
+            return 0;
+
+        string code = tree.ToCode();
+        if (string.IsNullOrWhiteSpace(code))
+            return 0;
+        code = code.NormalizeLineEndings();
+        var lines = code.Split(new[] { '\n' }, StringSplitOptions.None);
+        return lines.Count(line => !string.IsNullOrWhiteSpace(line));
+    }
+
+    public static int CountMethods(this TreeNode<SemanticNode> tree)
+    {
+        if (tree == null)
+            return 0;
+
+        return tree.GetMethods().Count;
+    }
+
+    public static int CountStaticExtensionMethods(this TreeNode<SemanticNode> tree)
+    {
+        if (tree == null)
+            return 0;
+
+        return tree.FindStaticExtensionMethods().Count;
+    }
+
+    public static void DeleteComments<T>(this TreeNode<SemanticNode> root)
+    {
+        root.DeleteRecursive(t => SyntaxKindGroups.CommentTrivia.Contains(t.Value.Kind));
+    }
+
+    public static void DeleteCompilationUnit(this TreeNode<SemanticNode> tree)
     {
         foreach (
-            var x in originalTree.FindWhere(t =>
-                SyntaxKindGroups.CollectionInitializerKinds.Contains(t.Value.Kind)
+            var x in tree.FindWhere(t => t.Value.Kind == SyntaxKind.CompilationUnit)
+                .Skip(1)
+                .ToList()
+        )
+        {
+            x.Delete(DeleteType.SingleNode);
+        }
+    }
+
+    public static TreeNode<SemanticNode> DeleteExcessNewlines(this TreeNode<SemanticNode> root)
+    {
+        foreach (
+            var group in root.FindConsecutive(t =>
+                SyntaxKindGroups.WhitespaceTrivia.Contains(t.Value.Kind)
             )
         )
         {
-            x.Children = x.Children.Interleave(t => t.Value.Value);
+            if (group.Count <= 2)
+                continue;
+            var lastNewline = group.FindLastIndex(t => t.Value.Kind == SyntaxKind.EndOfLineTrivia);
+            if (lastNewline < 1)
+                continue;
+            for (int i = 0; i < lastNewline; i++)
+                group[i].Delete(DeleteType.SingleNode);
         }
-        return originalTree;
+
+        return root;
     }
 
-    public static void MoveNonExtensionStaticMethodsInStaticClassesIntoSingleClass(
-        this TreeNode<SemanticNode> root
+    public static IEnumerable<TreeNode<SemanticNode>> DeleteKind(
+        this TreeNode<SemanticNode> tree,
+        SyntaxKind kind,
+        DeleteType deleteType = DeleteType.SingleNode
     )
     {
-        var existingClass = root.FindWhere(t =>
-                t.Value.Kind == SyntaxKind.ClassDeclaration && t.Value.Name == "StaticHelpers"
-            )
-            .FirstOrDefault();
-        var methodsToMove = root.GetNonExtensionMethodsInExtensionClass();
-
-        foreach (var c in methodsToMove)
-        {
-            c.Value.Modifier = AccessModifier.Public;
-            c.RemoveSelf();
-        }
-
-        var declaration = "public class StaticHelpers {}";
-        if (existingClass != null)
-        {
-            methodsToMove.AddRange(existingClass.GetMethods().Select(t => t.tree).ToList());
-            existingClass.RemoveSelf();
-        }
-        var newClassTree = methodsToMove.WrapInDeclaration(declaration);
-        root.Children.Add(newClassTree);
+        return tree.DeleteKinds(new HashSet<SyntaxKind>() { kind }, deleteType);
     }
 
-    public static TreeNode<SemanticNode> MoveCursorTo(
-        this TreeNode<SemanticNode> treeNode,
+    public static IEnumerable<TreeNode<SemanticNode>> DeleteKinds(
+        this TreeNode<SemanticNode> tree,
+        HashSet<SyntaxKind> kinds,
+        DeleteType deleteType = DeleteType.SingleNode
+    )
+    {
+        foreach (var x in tree.FindWhere(t => kinds.Contains(t.Value.Kind)).ToList())
+        {
+            yield return x;
+            x.Delete(DeleteType.SingleNode);
+        }
+    }
+
+    public static void DivideIntoPartialClassByInterface(
+        this TreeNode<SemanticNode> tree,
+        TreeNode<SemanticNode> classObj,
+        TreeNode<SemanticNode> interfaceDecl
+    )
+    {
+        var className = classObj.GetClassName();
+        var interfaceName = interfaceDecl.GetInterfaceName();
+
+        if (StaticHelpers.NamesAreInvalid(className, interfaceName))
+            return;
+
+        classObj.EnsureClassIsMarkedPartial();
+
+        var interfaceMethodNames = interfaceDecl.GetMethodNamesDeclaredInInterface();
+        var methodsToExtract = classObj.FindImplementingMethodsInClass(interfaceMethodNames);
+
+        if (methodsToExtract.Count == 0)
+            return;
+
+        var newPartialClass = methodsToExtract.CreateNewPartialClassForInterface(
+            className,
+            interfaceName
+        );
+
+        classObj.InsertAfter(newPartialClass);
+
+        StaticHelpers.LogSuccessfulExtraction(interfaceName, methodsToExtract.Count);
+    }
+
+    public static void DivideIntoPartialClassesByInterfaces(
+        this TreeNode<SemanticNode> tree,
+        string className,
+        string interfaceName = null
+    )
+    {
+        var tnsn = tree.FindWhere(t =>
+                t.Value.Kind == SyntaxKind.ClassDeclaration && t.Value.Name == className
+            )
+            .First();
+        if (interfaceName == null)
+            interfaceName = tnsn.Value.BaseType;
+        var baseInterface = tree.FindWhere(t =>
+                t.Value.Kind == SyntaxKind.InterfaceDeclaration && t.Value.Name == interfaceName
+            )
+            .First();
+        var ia = (InterfaceNode)baseInterface.Value;
+        foreach (var i in ia.BaseTypes)
+        {
+            var iDecl = tree.FindWhere(t =>
+                    t.Value.Kind == SyntaxKind.InterfaceDeclaration && t.Value.Name == i
+                )
+                .First();
+            DivideIntoPartialClassByInterface(tree, tnsn, iDecl);
+        }
+    }
+
+    public static void EmptyMemberDeclarationsContents(
+        this TreeNode<SemanticNode> tree,
+        _ProjectPaths path
+    )
+    {
+        var list = tree.FindWhere(t => t.Value.Kind == SyntaxKind.Block).ToList();
+        foreach (var node in list)
+        {
+            node.Children.Where(t => SyntaxKindGroups.BodyElements.Contains(t.Value.Kind))
+                .ToList()
+                .ForEach(t => node.RemoveChild(t));
+            var open = node.FindWhere(t => t.Value.Kind == SyntaxKind.OpenBraceToken).First();
+            open.AddChild(
+                new TreeNode<SemanticNode>(
+                    new UnknownNode(
+                        new SyntaxElementNode(
+                            SyntaxKind.ThrowExpression,
+                            "throw new NotImplementedException();"
+                        )
+                    )
+                )
+            );
+        }
+
+        tree.TestCompile(path.ProjectFilePath, path.MethodFilePath);
+    }
+
+    public static void EmptyTypeDeclarationsContents(
+        this TreeNode<SemanticNode> tree,
+        _ProjectPaths path
+    )
+    {
+        var list = tree.FindWhere(t => SyntaxKindGroups.TypeDeclarations.Contains(t.Value.Kind))
+            .ToList();
+        foreach (var node in list)
+        {
+            node.Children.Where(t => t.Value.HasName).ToList().ForEach(t => node.RemoveChild(t));
+        }
+
+        tree.DeleteRecursive(t => t.Value.Kind == SyntaxKind.BaseList, DeleteType.NodeAndSubTree);
+        tree.TestCompile(path.ProjectFilePath, path.ClassFilePath);
+    }
+
+    public static void EnsureClassIsMarkedPartial(this TreeNode<SemanticNode> classObj)
+    {
+        if (classObj.AlreadyHasPartialKeyword())
+            return;
+
+        var classKeyword = classObj.FindWhere(t => t.Value.Kind == SyntaxKind.ClassKeyword).First();
+        classObj.InsertPartialKeywordBefore(classKeyword);
+    }
+
+    public static List<ClassNode> FindClasses(this TreeNode<SemanticNode> tree)
+    {
+        return tree.FindKindVal(SyntaxKind.ClassDeclaration).Cast<ClassNode>().ToList();
+    }
+
+    public static List<TreeNode<SemanticNode>> FindClassNodes(this TreeNode<SemanticNode> node)
+    {
+        return node.FindWhere(t => t.Value.Kind == SyntaxKind.ClassDeclaration).ToList();
+    }
+
+    public static IEnumerable<TreeNode<SemanticNode>> FindDelimitedText(
+        this TreeNode<SemanticNode> root,
+        HashSet<SyntaxKind> delimeters
+    )
+    {
+        if (root == null)
+            return Enumerable.Empty<TreeNode<SemanticNode>>();
+        return root.AsList().FindDelimitedText(delimeters);
+    }
+
+    public static List<TreeNode<SemanticNode>> FindImplementingMethodsInClass(
+        this TreeNode<SemanticNode> classObj,
+        HashSet<string> interfaceMethodNames
+    ) =>
+        classObj
+            .FindWhere(t => t.Value.Kind == SyntaxKind.MethodDeclaration)
+            .Where(m => interfaceMethodNames.Contains(((MethodNode)m.Value).Name))
+            .ToList();
+
+    public static List<TreeNode<SemanticNode>> FindKind(
+        this TreeNode<SemanticNode> tree,
         SyntaxKind kind
     )
     {
-        return treeNode.FindWhere(t => t.Value.Kind == kind).First();
+        return tree.FindWhere(t => t.Value.Kind == kind).ToList();
     }
 
-    public static TreeNode<SemanticNode> MergeSelf(this TreeNode<SemanticNode> source)
-    {
-        if (source == null)
-            return source;
-
-        var maxDepth = source.GetMaxParentCount();
-
-        for (int i = 0; i <= maxDepth; i++)
-        {
-            source.MergeAtDepth(i);
-        }
-        var result = source.GroupByModifierKindName().Tree;
-        result.DeleteExcessNewlines();
-        return result;
-    }
-
-    public static TreeNode<SemanticNode> MergePartials(
+    public static List<TreeNode<SemanticNode>> FindKinds(
         this TreeNode<SemanticNode> tree,
-        string className
+        HashSet<SyntaxKind> kinds
     )
     {
-        var partials = tree.FindClasses().Where(t => t.Name == className && t.HasMethods).ToList();
-        var source = partials.Skip(1).Select(t => t.tree).ToList();
-        var result = partials.First().tree.MergeFromList(source);
-        return result;
+        return tree.FindWhere(t => kinds.Contains(t.Value.Kind)).ToList();
     }
 
-    public static TreeNode<SemanticNode> MergeFromList(
-        this TreeNode<SemanticNode> destination,
-        List<TreeNode<SemanticNode>> sources
+    public static List<SemanticNode> FindKindVal(this TreeNode<SemanticNode> tree, SyntaxKind kind)
+    {
+        return tree.FindKind(kind).Select(t => t.Value).ToList();
+    }
+
+    public static TreeNode<SemanticNode> FindNameAfterType(
+        this TreeNode<SemanticNode> tree,
+        HashSet<SyntaxKind> stopKinds
     )
     {
-        if (sources == null || sources.Count == 0)
-            return destination;
-
-        foreach (var source in sources)
-        {
-            if (source != null)
-                destination.MergeFrom(source); // delegates to single-source version
-        }
-
-        return destination;
-    }
-
-    public static TreeNode<SemanticNode> MergeFrom(
-        this TreeNode<SemanticNode> destination,
-        TreeNode<SemanticNode> source
-    )
-    {
-        destination.AddMissingContainersByDepthFrom(source);
-        var newLowLevel = destination.ReplaceExistingLowestLevelTypesFrom(source);
-        destination.AddNewLowestLevelTypesFrom(newLowLevel);
-        return destination;
-    }
-
-    public static void MergeAtDepth(this TreeNode<SemanticNode> source, int index)
-    {
-        var toMerge = source
-            .FindKinds(
-                new HashSet<SyntaxKind>
-                {
-                    SyntaxKind.ClassDeclaration,
-                    SyntaxKind.NamespaceDeclaration,
-                }
+        return tree.FindSkipStop(
+                t => t.Value.Kind == SyntaxKind.IdentifierToken,
+                t =>
+                    SyntaxKindGroups.ModifierKeywords.Contains(t.Value.Kind)
+                    || SyntaxKindGroups.KindsContainingParameterType.Contains(t.Value.Kind)
+                    || t.Value.Kind == SyntaxKind.AttributeList,
+                t => stopKinds.Contains(t.Value.Kind)
             )
-            .ToList();
-
-        var groups = toMerge
-            .Where(t => t.Value.Parents.Count == index)
-            .GroupBy(t => t.Value.FullName)
-            .Where(g => g.Count() > 1 && !string.IsNullOrEmpty(g.Key))
-            .ToList();
-
-        foreach (var group in groups)
-        {
-            var first = group.First();
-            foreach (var rest in group.Skip(1).ToList())
-            {
-                first.MergeFrom(rest);
-                rest.RemoveSelf();
-            }
-        }
-    }
-
-    public static void InsertPartialKeywordBefore(
-        this TreeNode<SemanticNode> classObj,
-        TreeNode<SemanticNode> classKeyword
-    )
-    {
-        var partialElement = new SyntaxElementNode(SyntaxKind.PartialKeyword, "partial ");
-        var partialSemantic = new UnknownNode(partialElement);
-        var partialNode = new TreeNode<SemanticNode>(partialSemantic);
-        partialSemantic.SetTreeNode(partialNode);
-        classKeyword.InsertBefore(partialNode);
-    }
-
-    public static void InitializeAllNodes(this TreeNode<SemanticNode> node)
-    {
-        foreach (var child in node.Children)
-        {
-            child.InitializeAllNodes();
-        }
-
-        node.Value.SetTreeNode(node);
-    }
-
-    public static void GroupStaticExtensionMethods(this TreeNode<SemanticNode> root)
-    {
-        var ret = new List<TreeNode<SemanticNode>>();
-        var extensionMethods = root.FindStaticExtensionMethods();
-        extensionMethods.SetStaticExtensionMethodsPublic();
-
-        var classes = root.FindClasses().Where(t => t.IsStaticClass).ToList();
-        foreach (var c in classes)
-        {
-            c.tree.RemoveSelf();
-        }
-
-        var dict = extensionMethods
-            .GroupBy(t => t.GetStaticClassName())
-            .ToDictionary(t => t.Key, t => t.ToList());
-
-        foreach (var kv in dict)
-        {
-            string declaration = $"public static class {kv.Key}" + "{}";
-            var newNode = kv.Value.WrapInDeclaration(declaration);
-            root.Children.Add(newNode);
-        }
-    }
-
-    public static TreeNode<SemanticNode> GroupConsecutiveChildren(
-        this TreeNode<SemanticNode> node,
-        Func<TreeNode<SemanticNode>, bool> predicate
-    )
-    {
-        if (node.Children.Count == 0)
-            return new TreeNode<SemanticNode>(node.Value);
-
-        var groups = node.Children.GroupConsecutive(predicate);
-
-        var copy = new TreeNode<SemanticNode>(node.Value);
-
-        if (groups.Count > 1)
-        {
-            groups.ForEach(group =>
-            {
-                var cu = CompilationUnitNode.Factory();
-                group.ForEach(item => cu.AddChild(item.GroupConsecutiveChildren(predicate)));
-                copy.AddChild(cu);
-            });
-        }
-        else
-        {
-            node.Children.ForEach(c => copy.AddChild(c.GroupConsecutiveChildren(predicate)));
-        }
-        copy.InitializeAllNodes();
-        return copy;
-    }
-
-    public static (
-        TreeNode<SemanticNode> Tree,
-        List<List<TreeNode<SemanticNode>>> Groups
-    ) GroupByModifierKindName(this TreeNode<SemanticNode> tree)
-    {
-        var groups = new List<List<TreeNode<SemanticNode>>>();
-
-        foreach (var x in tree.FindWhere(t => t.Value.HasDirectNamedChildren))
-        {
-            var sorted = x.Children.SortedByModifierKindName();
-            groups.AddRange(sorted.GroupedByModifierKind());
-            x.Children = sorted;
-        }
-
-        return (tree, groups);
-    }
-
-    public static List<UsingDirectiveNode> GetUsings(this TreeNode<SemanticNode> tree)
-    {
-        return tree.FindWhere(t => t.Value.Kind == SyntaxKind.UsingDirective)
-            .Select(t => (UsingDirectiveNode)t.Value)
-            .ToList();
-    }
-
-    public static string GetThisParameterName(this TreeNode<SemanticNode> node)
-    {
-        var thisParam = node.FindWhere(t => t.Value is ParameterNode p && p.IsThis)
-            .Select(t => (ParameterNode)t.Value)
             .FirstOrDefault();
-
-        if (thisParam == null || string.IsNullOrWhiteSpace(thisParam.TypeText))
-            throw new InvalidOperationException(
-                "Extension method must contain a 'this' parameter."
-            );
-
-        string typeName = thisParam.TypeText.Trim();
-
-        int lastDot = typeName.LastIndexOf('.');
-        if (lastDot >= 0)
-            typeName = typeName.Substring(lastDot + 1);
-
-        typeName = typeName.Replace("<", "Of").Replace(">", "").Replace(",", "");
-
-        return Regex.Replace(typeName, @"[^a-zA-Z0-9]", "");
     }
 
-    public static string GetStaticClassName(this TreeNode<SemanticNode> node)
-    {
-        return $"ExtensionsOf{node.GetThisParameterName()}";
-    }
-
-    public static List<TreeNode<SemanticNode>> GetNonExtensionMethodsInExtensionClass(
-        this TreeNode<SemanticNode> root
+    public static TreeNode<SemanticNode> FindNameAfterTypeBeforeSemicolon(
+        this TreeNode<SemanticNode> tree
     )
     {
-        var staticClasses = root.FindClasses().Where(c => c.IsStaticClass).ToList();
-        var ret = staticClasses
-            .SelectMany(t =>
-                t.tree.GetMethods().Where(m => m.IsStatic && !m.IsExtension).Select(m => m.tree)
+        var stopKinds = new HashSet<SyntaxKind> { SyntaxKind.SemicolonToken };
+        return tree.FindNameAfterType(stopKinds);
+    }
+
+    public static TreeNode<SemanticNode> FindParentByFullName(
+        this TreeNode<SemanticNode> root,
+        string parentFullName
+    )
+    {
+        if (string.IsNullOrEmpty(parentFullName))
+            return root;
+
+        return root.FindWhere(t =>
+                t.Value.FullName == parentFullName && t.Value is not UsingDirectiveNode
             )
+            .First();
+    }
+
+    public static List<ClassNode> FindStaticClasses(this TreeNode<SemanticNode> tree)
+    {
+        return tree.FindClasses().Where(t => t.IsStaticClass).ToList();
+    }
+
+    public static List<TreeNode<SemanticNode>> FindStaticExtensionMethods(
+        this TreeNode<SemanticNode> tree
+    )
+    {
+        var ret = tree.GetMethods()
+            .Where(t => t.IsStatic && t.IsExtension)
+            .Select(t => t.tree)
             .ToList();
         return ret;
     }
 
-    public static IEnumerable<TreeNode<SemanticNode>> GetNamedNodesAtDepth(
-        this TreeNode<SemanticNode> root,
-        int depth
-    ) => root.GetNamedNodes().Where(t => t.Value.Parents.Count == depth);
-
-    public static IEnumerable<TreeNode<SemanticNode>> GetNamedNodes(
-        this TreeNode<SemanticNode> root
-    ) => root.FindWhere(t => t.Value.HasName);
-
-    public static List<MethodNode> GetMethods(this TreeNode<SemanticNode> tree)
+    public static IEnumerable<TreeNode<SemanticNode>> FindSyntaxKind(
+        this TreeNode<SemanticNode> node,
+        SyntaxKind kind
+    )
     {
-        return tree.FindWhere(t => t.Value.Kind == SyntaxKind.MethodDeclaration)
-            .Select(t => (MethodNode)t.Value)
-            .ToList();
+        return node.FindSyntaxKinds(new HashSet<SyntaxKind>() { kind });
     }
 
-    public static HashSet<string> GetMethodNamesDeclaredInInterface(
-        this TreeNode<SemanticNode> interfaceDecl
-    ) =>
-        interfaceDecl
-            .FindWhere(t => t.Value.Kind == SyntaxKind.MethodDeclaration)
-            .Select(t => ((MethodNode)t.Value).Name)
-            .Where(n => !string.IsNullOrEmpty(n))
-            .ToHashSet(StringComparer.Ordinal);
+    public static IEnumerable<TreeNode<SemanticNode>> FindSyntaxKinds(
+        this TreeNode<SemanticNode> node,
+        HashSet<SyntaxKind> kinds
+    )
+    {
+        var ret = node.FindWhere(t => kinds.Contains(t.Value.Kind));
+        return ret;
+    }
 
-    public static int GetMaxParentCount(this TreeNode<SemanticNode> root) =>
-        root.GetNamedNodes().Max(t => t.Value.Parents.Count);
+    public static List<(string code, TreeNode<SemanticNode> node)> FlattenToCode(
+        this TreeNode<SemanticNode> tree
+    )
+    {
+        var list = tree.Flatten();
+        List<(string code, TreeNode<SemanticNode> node)> ret =
+            new List<(string code, TreeNode<SemanticNode> node)>();
+        foreach (var l in list)
+        {
+            ret.Add((l.ToCode(), l));
+        }
 
-    public static List<TreeNode<SemanticNode>> GetLowestLevelTypes(
-        this TreeNode<SemanticNode> root
-    ) => root.FindWhere(t => t.Value.HasName && t.Value.ChildOnly).ToList();
+        return ret;
+    }
 
-    public static string GetInterfaceName(this TreeNode<SemanticNode> interfaceDecl) =>
-        ((InterfaceNode)interfaceDecl.Value).Name ?? string.Empty;
+    public static TreeNode<SemanticNode> Format(this TreeNode<SemanticNode> tree)
+    {
+        var code = tree.ToCode();
+        code = CSharpierFormatter.Format(code);
+        tree = SemanticTree.DeserializeCode(code);
+        return tree;
+    }
+
+    public static string GetClassName(this TreeNode<SemanticNode> classObj) =>
+        ((ClassNode)classObj.Value).Name ?? string.Empty;
 
     public static Dictionary<string, List<TreeNode<SemanticNode>>> GetDerivedClasses(
         this TreeNode<SemanticNode> tree
@@ -1432,447 +1380,489 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         return result;
     }
 
-    public static string GetClassName(this TreeNode<SemanticNode> classObj) =>
-        ((ClassNode)classObj.Value).Name ?? string.Empty;
+    public static string GetInterfaceName(this TreeNode<SemanticNode> interfaceDecl) =>
+        ((InterfaceNode)interfaceDecl.Value).Name ?? string.Empty;
 
-    public static TreeNode<SemanticNode> Format(this TreeNode<SemanticNode> tree)
-    {
-        var code = tree.ToCode();
-        code = CSharpierFormatter.Format(code);
-        tree = SemanticTree.DeserializeCode(code);
-        return tree;
-    }
+    public static List<TreeNode<SemanticNode>> GetLowestLevelTypes(
+        this TreeNode<SemanticNode> root
+    ) => root.FindWhere(t => t.Value.HasName && t.Value.ChildOnly).ToList();
 
-    public static List<(string code, TreeNode<SemanticNode> node)> FlattenToCode(
-        this TreeNode<SemanticNode> tree
-    )
-    {
-        var list = tree.Flatten();
-        List<(string code, TreeNode<SemanticNode> node)> ret =
-            new List<(string code, TreeNode<SemanticNode> node)>();
-        foreach (var l in list)
-        {
-            ret.Add((l.ToCode(), l));
-        }
+    public static int GetMaxParentCount(this TreeNode<SemanticNode> root) =>
+        root.GetNamedNodes().Max(t => t.Value.Parents.Count);
 
-        return ret;
-    }
-
-    public static IEnumerable<TreeNode<SemanticNode>> FindSyntaxKinds(
-        this TreeNode<SemanticNode> node,
-        HashSet<SyntaxKind> kinds
-    )
-    {
-        var ret = node.FindWhere(t => kinds.Contains(t.Value.Kind));
-        return ret;
-    }
-
-    public static IEnumerable<TreeNode<SemanticNode>> FindSyntaxKind(
-        this TreeNode<SemanticNode> node,
-        SyntaxKind kind
-    )
-    {
-        return node.FindSyntaxKinds(new HashSet<SyntaxKind>() { kind });
-    }
-
-    public static List<TreeNode<SemanticNode>> FindStaticExtensionMethods(
-        this TreeNode<SemanticNode> tree
-    )
-    {
-        var ret = tree.GetMethods()
-            .Where(t => t.IsStatic && t.IsExtension)
-            .Select(t => t.tree)
-            .ToList();
-        return ret;
-    }
-
-    public static List<ClassNode> FindStaticClasses(this TreeNode<SemanticNode> tree)
-    {
-        return tree.FindClasses().Where(t => t.IsStaticClass).ToList();
-    }
-
-    public static TreeNode<SemanticNode> FindParentByFullName(
-        this TreeNode<SemanticNode> root,
-        string parentFullName
-    )
-    {
-        if (string.IsNullOrEmpty(parentFullName))
-            return root;
-
-        return root.FindWhere(t =>
-                t.Value.FullName == parentFullName && t.Value is not UsingDirectiveNode
-            )
-            .First();
-    }
-
-    public static TreeNode<SemanticNode> FindNameAfterTypeBeforeSemicolon(
-        this TreeNode<SemanticNode> tree
-    )
-    {
-        var stopKinds = new HashSet<SyntaxKind> { SyntaxKind.SemicolonToken };
-        return tree.FindNameAfterType(stopKinds);
-    }
-
-    public static TreeNode<SemanticNode> FindNameAfterType(
-        this TreeNode<SemanticNode> tree,
-        HashSet<SyntaxKind> stopKinds
-    )
-    {
-        return tree.FindSkipStop(
-                t => t.Value.Kind == SyntaxKind.IdentifierToken,
-                t =>
-                    SyntaxKindGroups.ModifierKeywords.Contains(t.Value.Kind)
-                    || SyntaxKindGroups.KindsContainingParameterType.Contains(t.Value.Kind)
-                    || t.Value.Kind == SyntaxKind.AttributeList,
-                t => stopKinds.Contains(t.Value.Kind)
-            )
-            .FirstOrDefault();
-    }
-
-    public static List<SemanticNode> FindKindVal(this TreeNode<SemanticNode> tree, SyntaxKind kind)
-    {
-        return tree.FindKind(kind).Select(t => t.Value).ToList();
-    }
-
-    public static List<TreeNode<SemanticNode>> FindKinds(
-        this TreeNode<SemanticNode> tree,
-        HashSet<SyntaxKind> kinds
-    )
-    {
-        return tree.FindWhere(t => kinds.Contains(t.Value.Kind)).ToList();
-    }
-
-    public static List<TreeNode<SemanticNode>> FindKind(
-        this TreeNode<SemanticNode> tree,
-        SyntaxKind kind
-    )
-    {
-        return tree.FindWhere(t => t.Value.Kind == kind).ToList();
-    }
-
-    public static List<TreeNode<SemanticNode>> FindImplementingMethodsInClass(
-        this TreeNode<SemanticNode> classObj,
-        HashSet<string> interfaceMethodNames
+    public static HashSet<string> GetMethodNamesDeclaredInInterface(
+        this TreeNode<SemanticNode> interfaceDecl
     ) =>
-        classObj
+        interfaceDecl
             .FindWhere(t => t.Value.Kind == SyntaxKind.MethodDeclaration)
-            .Where(m => interfaceMethodNames.Contains(((MethodNode)m.Value).Name))
-            .ToList();
+            .Select(t => ((MethodNode)t.Value).Name)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToHashSet(StringComparer.Ordinal);
 
-    public static IEnumerable<TreeNode<SemanticNode>> FindDelimitedText(
+    public static List<MethodNode> GetMethods(this TreeNode<SemanticNode> tree)
+    {
+        return tree.FindWhere(t => t.Value.Kind == SyntaxKind.MethodDeclaration)
+            .Select(t => (MethodNode)t.Value)
+            .ToList();
+    }
+
+    public static IEnumerable<TreeNode<SemanticNode>> GetNamedNodes(
+        this TreeNode<SemanticNode> root
+    ) => root.FindWhere(t => t.Value.HasName);
+
+    public static IEnumerable<TreeNode<SemanticNode>> GetNamedNodesAtDepth(
         this TreeNode<SemanticNode> root,
-        HashSet<SyntaxKind> delimeters
+        int depth
+    ) => root.GetNamedNodes().Where(t => t.Value.Parents.Count == depth);
+
+    public static List<TreeNode<SemanticNode>> GetNonExtensionMethodsInExtensionClass(
+        this TreeNode<SemanticNode> root
     )
     {
-        if (root == null)
-            return Enumerable.Empty<TreeNode<SemanticNode>>();
-        return root.AsList().FindDelimitedText(delimeters);
-    }
-
-    public static List<TreeNode<SemanticNode>> FindClassNodes(this TreeNode<SemanticNode> node)
-    {
-        return node.FindWhere(t => t.Value.Kind == SyntaxKind.ClassDeclaration).ToList();
-    }
-
-    public static List<ClassNode> FindClasses(this TreeNode<SemanticNode> tree)
-    {
-        return tree.FindKindVal(SyntaxKind.ClassDeclaration).Cast<ClassNode>().ToList();
-    }
-
-    public static void EnsureClassIsMarkedPartial(this TreeNode<SemanticNode> classObj)
-    {
-        if (classObj.AlreadyHasPartialKeyword())
-            return;
-
-        var classKeyword = classObj.FindWhere(t => t.Value.Kind == SyntaxKind.ClassKeyword).First();
-        classObj.InsertPartialKeywordBefore(classKeyword);
-    }
-
-    public static void EmptyTypeDeclarationsContents(
-        this TreeNode<SemanticNode> tree,
-        _ProjectPaths path
-    )
-    {
-        var list = tree.FindWhere(t => SyntaxKindGroups.TypeDeclarations.Contains(t.Value.Kind))
+        var staticClasses = root.FindClasses().Where(c => c.IsStaticClass).ToList();
+        var ret = staticClasses
+            .SelectMany(t =>
+                t.tree.GetMethods().Where(m => m.IsStatic && !m.IsExtension).Select(m => m.tree)
+            )
             .ToList();
-        foreach (var node in list)
-        {
-            node.Children.Where(t => t.Value.HasName).ToList().ForEach(t => node.RemoveChild(t));
-        }
-
-        tree.DeleteRecursive(t => t.Value.Kind == SyntaxKind.BaseList, DeleteType.NodeAndSubTree);
-        tree.TestCompile(path.ProjectFilePath, path.ClassFilePath);
+        return ret;
     }
 
-    public static void EmptyMemberDeclarationsContents(
-        this TreeNode<SemanticNode> tree,
-        _ProjectPaths path
-    )
+    public static string GetStaticClassName(this TreeNode<SemanticNode> node)
     {
-        var list = tree.FindWhere(t => t.Value.Kind == SyntaxKind.Block).ToList();
-        foreach (var node in list)
-        {
-            node.Children.Where(t => SyntaxKindGroups.BodyElements.Contains(t.Value.Kind))
-                .ToList()
-                .ForEach(t => node.RemoveChild(t));
-            var open = node.FindWhere(t => t.Value.Kind == SyntaxKind.OpenBraceToken).First();
-            open.AddChild(
-                new TreeNode<SemanticNode>(
-                    new UnknownNode(
-                        new SyntaxElementNode(
-                            SyntaxKind.ThrowExpression,
-                            "throw new NotImplementedException();"
-                        )
-                    )
-                )
+        return $"ExtensionsOf{node.GetThisParameterName()}";
+    }
+
+    public static string GetThisParameterName(this TreeNode<SemanticNode> node)
+    {
+        var thisParam = node.FindWhere(t => t.Value is ParameterNode p && p.IsThis)
+            .Select(t => (ParameterNode)t.Value)
+            .FirstOrDefault();
+
+        if (thisParam == null || string.IsNullOrWhiteSpace(thisParam.TypeText))
+            throw new InvalidOperationException(
+                "Extension method must contain a 'this' parameter."
             );
-        }
 
-        tree.TestCompile(path.ProjectFilePath, path.MethodFilePath);
+        string typeName = thisParam.TypeText.Trim();
+
+        int lastDot = typeName.LastIndexOf('.');
+        if (lastDot >= 0)
+            typeName = typeName.Substring(lastDot + 1);
+
+        typeName = typeName.Replace("<", "Of").Replace(">", "").Replace(",", "");
+
+        return Regex.Replace(typeName, @"[^a-zA-Z0-9]", "");
     }
 
-    public static void DivideIntoPartialClassesByInterfaces(
-        this TreeNode<SemanticNode> tree,
-        string className,
-        string interfaceName = null
+    public static List<UsingDirectiveNode> GetUsings(this TreeNode<SemanticNode> tree)
+    {
+        return tree.FindWhere(t => t.Value.Kind == SyntaxKind.UsingDirective)
+            .Select(t => (UsingDirectiveNode)t.Value)
+            .ToList();
+    }
+
+    public static (
+        TreeNode<SemanticNode> Tree,
+        List<List<TreeNode<SemanticNode>>> Groups
+    ) GroupByModifierKindName(this TreeNode<SemanticNode> tree)
+    {
+        var groups = new List<List<TreeNode<SemanticNode>>>();
+
+        foreach (var x in tree.FindWhere(t => t.Value.HasDirectNamedChildren))
+        {
+            var sorted = x.Children.SortedByModifierKindName();
+            groups.AddRange(sorted.GroupedByModifierKind());
+            x.Children = sorted;
+        }
+
+        return (tree, groups);
+    }
+
+    public static TreeNode<SemanticNode> GroupConsecutiveChildren(
+        this TreeNode<SemanticNode> node,
+        Func<TreeNode<SemanticNode>, bool> predicate
     )
     {
-        var tnsn = tree.FindWhere(t =>
-                t.Value.Kind == SyntaxKind.ClassDeclaration && t.Value.Name == className
+        if (node.Children.Count == 0)
+            return new TreeNode<SemanticNode>(node.Value);
+
+        var groups = node.Children.GroupConsecutive(predicate);
+
+        var copy = new TreeNode<SemanticNode>(node.Value);
+
+        if (groups.Count > 1)
+        {
+            groups.ForEach(group =>
+            {
+                var cu = CompilationUnitNode.Factory();
+                group.ForEach(item => cu.AddChild(item.GroupConsecutiveChildren(predicate)));
+                copy.AddChild(cu);
+            });
+        }
+        else
+        {
+            node.Children.ForEach(c => copy.AddChild(c.GroupConsecutiveChildren(predicate)));
+        }
+        copy.InitializeAllNodes();
+        return copy;
+    }
+
+    public static void GroupStaticExtensionMethods(this TreeNode<SemanticNode> root)
+    {
+        var ret = new List<TreeNode<SemanticNode>>();
+        var extensionMethods = root.FindStaticExtensionMethods();
+        extensionMethods.SetStaticExtensionMethodsPublic();
+
+        var classes = root.FindClasses().Where(t => t.IsStaticClass).ToList();
+        foreach (var c in classes)
+        {
+            c.tree.RemoveSelf();
+        }
+
+        var dict = extensionMethods
+            .GroupBy(t => t.GetStaticClassName())
+            .ToDictionary(t => t.Key, t => t.ToList());
+
+        foreach (var kv in dict)
+        {
+            string declaration = $"public static class {kv.Key}" + "{}";
+            var newNode = kv.Value.WrapInDeclaration(declaration);
+            root.Children.Add(newNode);
+        }
+    }
+
+    public static void InitializeAllNodes(this TreeNode<SemanticNode> node)
+    {
+        foreach (var child in node.Children)
+        {
+            child.InitializeAllNodes();
+        }
+
+        node.Value.SetTreeNode(node);
+    }
+
+    public static void InsertPartialKeywordBefore(
+        this TreeNode<SemanticNode> classObj,
+        TreeNode<SemanticNode> classKeyword
+    )
+    {
+        var partialElement = new SyntaxElementNode(SyntaxKind.PartialKeyword, "partial ");
+        var partialSemantic = new UnknownNode(partialElement);
+        var partialNode = new TreeNode<SemanticNode>(partialSemantic);
+        partialSemantic.SetTreeNode(partialNode);
+        classKeyword.InsertBefore(partialNode);
+    }
+
+    public static void MergeAtDepth(this TreeNode<SemanticNode> source, int index)
+    {
+        var toMerge = source
+            .FindKinds(
+                new HashSet<SyntaxKind>
+                {
+                    SyntaxKind.ClassDeclaration,
+                    SyntaxKind.NamespaceDeclaration,
+                }
             )
-            .First();
-        if (interfaceName == null)
-            interfaceName = tnsn.Value.BaseType;
-        var baseInterface = tree.FindWhere(t =>
-                t.Value.Kind == SyntaxKind.InterfaceDeclaration && t.Value.Name == interfaceName
-            )
-            .First();
-        var ia = (InterfaceNode)baseInterface.Value;
-        foreach (var i in ia.BaseTypes)
+            .ToList();
+
+        var groups = toMerge
+            .Where(t => t.Value.Parents.Count == index)
+            .GroupBy(t => t.Value.FullName)
+            .Where(g => g.Count() > 1 && !string.IsNullOrEmpty(g.Key))
+            .ToList();
+
+        foreach (var group in groups)
         {
-            var iDecl = tree.FindWhere(t =>
-                    t.Value.Kind == SyntaxKind.InterfaceDeclaration && t.Value.Name == i
-                )
-                .First();
-            DivideIntoPartialClassByInterface(tree, tnsn, iDecl);
+            var first = group.First();
+            foreach (var rest in group.Skip(1).ToList())
+            {
+                first.MergeFrom(rest);
+                rest.RemoveSelf();
+            }
         }
     }
 
-    public static void DivideIntoPartialClassByInterface(
-        this TreeNode<SemanticNode> tree,
-        TreeNode<SemanticNode> classObj,
-        TreeNode<SemanticNode> interfaceDecl
-    )
-    {
-        var className = classObj.GetClassName();
-        var interfaceName = interfaceDecl.GetInterfaceName();
-
-        if (StaticHelpers.NamesAreInvalid(className, interfaceName))
-            return;
-
-        classObj.EnsureClassIsMarkedPartial();
-
-        var interfaceMethodNames = interfaceDecl.GetMethodNamesDeclaredInInterface();
-        var methodsToExtract = classObj.FindImplementingMethodsInClass(interfaceMethodNames);
-
-        if (methodsToExtract.Count == 0)
-            return;
-
-        var newPartialClass = methodsToExtract.CreateNewPartialClassForInterface(
-            className,
-            interfaceName
-        );
-
-        classObj.InsertAfter(newPartialClass);
-
-        StaticHelpers.LogSuccessfulExtraction(interfaceName, methodsToExtract.Count);
-    }
-
-    public static IEnumerable<TreeNode<SemanticNode>> DeleteKinds(
-        this TreeNode<SemanticNode> tree,
-        HashSet<SyntaxKind> kinds,
-        DeleteType deleteType = DeleteType.SingleNode
-    )
-    {
-        foreach (var x in tree.FindWhere(t => kinds.Contains(t.Value.Kind)).ToList())
-        {
-            yield return x;
-            x.Delete(DeleteType.SingleNode);
-        }
-    }
-
-    public static IEnumerable<TreeNode<SemanticNode>> DeleteKind(
-        this TreeNode<SemanticNode> tree,
-        SyntaxKind kind,
-        DeleteType deleteType = DeleteType.SingleNode
-    )
-    {
-        return tree.DeleteKinds(new HashSet<SyntaxKind>() { kind }, deleteType);
-    }
-
-    public static TreeNode<SemanticNode> DeleteExcessNewlines(this TreeNode<SemanticNode> root)
-    {
-        foreach (
-            var group in root.FindConsecutive(t =>
-                SyntaxKindGroups.WhitespaceTrivia.Contains(t.Value.Kind)
-            )
-        )
-        {
-            if (group.Count <= 2)
-                continue;
-            var lastNewline = group.FindLastIndex(t => t.Value.Kind == SyntaxKind.EndOfLineTrivia);
-            if (lastNewline < 1)
-                continue;
-            for (int i = 0; i < lastNewline; i++)
-                group[i].Delete(DeleteType.SingleNode);
-        }
-
-        return root;
-    }
-
-    public static void DeleteCompilationUnit(this TreeNode<SemanticNode> tree)
-    {
-        foreach (
-            var x in tree.FindWhere(t => t.Value.Kind == SyntaxKind.CompilationUnit)
-                .Skip(1)
-                .ToList()
-        )
-        {
-            x.Delete(DeleteType.SingleNode);
-        }
-    }
-
-    public static void DeleteComments<T>(this TreeNode<SemanticNode> root)
-    {
-        root.DeleteRecursive(t => SyntaxKindGroups.CommentTrivia.Contains(t.Value.Kind));
-    }
-
-    public static int CountStaticExtensionMethods(this TreeNode<SemanticNode> tree)
-    {
-        if (tree == null)
-            return 0;
-
-        return tree.FindStaticExtensionMethods().Count;
-    }
-
-    public static int CountMethods(this TreeNode<SemanticNode> tree)
-    {
-        if (tree == null)
-            return 0;
-
-        return tree.GetMethods().Count;
-    }
-
-    public static int CountLinesOfCode(this TreeNode<SemanticNode> tree)
-    {
-        if (tree == null)
-            return 0;
-
-        string code = tree.ToCode();
-        if (string.IsNullOrWhiteSpace(code))
-            return 0;
-        code = code.NormalizeLineEndings();
-        var lines = code.Split(new[] { '\n' }, StringSplitOptions.None);
-        return lines.Count(line => !string.IsNullOrWhiteSpace(line));
-    }
-
-    public static TreeNode<SemanticNode> BuildRegionTree(
-        this TreeNode<SemanticNode> classNode,
-        Dictionary<string, List<TreeNode<SemanticNode>>> derivedMap,
-        Dictionary<string, TreeNode<SemanticNode>> byName
-    )
-    {
-        var className = ((ClassNode)classNode.Value).Name;
-        var region = RegionStartNode.Factory(className);
-        region.AddChild(classNode);
-
-        if (derivedMap.TryGetValue(className, out var children))
-        {
-            children
-                .OrderBy(c => ((ClassNode)c.Value).Name)
-                .Select(c => BuildRegionTree(c, derivedMap, byName))
-                .ToList()
-                .ForEach(region.AddChild);
-        }
-
-        region.AddChild(RegionEndNode.Factory());
-        return region;
-    }
-
-    public static List<string> AsCode<T>(this TreeNode<SemanticNode> tree)
-    {
-        var list = tree.Flatten().Select(t => t.ToCode()).ToList();
-        return list;
-    }
-
-    public static bool AlreadyHasPartialKeyword(this TreeNode<SemanticNode> classObj) =>
-        classObj.FindWhere(t => t.Value.Kind == SyntaxKind.PartialKeyword).Any();
-
-    public static void AddNewMember(
-        this TreeNode<SemanticNode> parent,
-        TreeNode<SemanticNode> member
-    )
-    {
-        if (member.Value.Name == "b")
-        {
-            int bp = 0;
-        }
-        parent.Value.MembersNode.AddChild(member);
-    }
-
-    public static void AddNewLowestLevelTypesFrom(
-        this TreeNode<SemanticNode> destination,
-        List<TreeNode<SemanticNode>> source
-    )
-    {
-        foreach (var sourceNode in source)
-        {
-            var parentFullName = sourceNode.Value.ParentFullName;
-            var targetParent = destination.FindParentByFullName(parentFullName);
-            targetParent.AddNewMember(sourceNode);
-        }
-    }
-
-    public static void AddMissingContainersByDepthFrom(
+    public static TreeNode<SemanticNode> MergeFrom(
         this TreeNode<SemanticNode> destination,
         TreeNode<SemanticNode> source
     )
     {
-        var maxDepth = source.GetMaxParentCount();
-
-        for (int depth = 0; depth <= maxDepth; depth++)
-            destination.AddMissingContainersAtDepth(source, depth);
+        destination.AddMissingContainersByDepthFrom(source);
+        var newLowLevel = destination.ReplaceExistingLowestLevelTypesFrom(source);
+        destination.AddNewLowestLevelTypesFrom(newLowLevel);
+        return destination;
     }
 
-    public static void AddMissingContainersAtDepth(
+    public static TreeNode<SemanticNode> MergeFromList(
         this TreeNode<SemanticNode> destination,
-        TreeNode<SemanticNode> source,
-        int depth
+        List<TreeNode<SemanticNode>> sources
     )
     {
-        var missing = source
-            .GetNamedNodesAtDepth(depth)
-            .Where(t => !t.Value.ChildOnly)
-            .NotPresentIn(destination.GetNamedNodes());
+        if (sources == null || sources.Count == 0)
+            return destination;
 
-        foreach (var node in missing)
+        foreach (var source in sources)
         {
-            var parent = destination.FindParentByFullName(node.Value.ParentFullName);
-            parent.Value.MembersNode.AddChild(node);
+            if (source != null)
+                destination.MergeFrom(source); // delegates to single-source version
         }
+
+        return destination;
+    }
+
+    public static TreeNode<SemanticNode> MergePartials(
+        this TreeNode<SemanticNode> tree,
+        string className
+    )
+    {
+        var partials = tree.FindClasses().Where(t => t.Name == className && t.HasMethods).ToList();
+        var source = partials.Skip(1).Select(t => t.tree).ToList();
+        var result = partials.First().tree.MergeFromList(source);
+        return result;
+    }
+
+    public static TreeNode<SemanticNode> MergeSelf(this TreeNode<SemanticNode> source)
+    {
+        if (source == null)
+            return source;
+
+        var maxDepth = source.GetMaxParentCount();
+
+        for (int i = 0; i <= maxDepth; i++)
+        {
+            source.MergeAtDepth(i);
+        }
+        var result = source.GroupByModifierKindName().Tree;
+        result.DeleteExcessNewlines();
+        return result;
+    }
+
+    public static TreeNode<SemanticNode> MoveCursorTo(
+        this TreeNode<SemanticNode> treeNode,
+        SyntaxKind kind
+    )
+    {
+        return treeNode.FindWhere(t => t.Value.Kind == kind).First();
+    }
+
+    public static void MoveNonExtensionStaticMethodsInStaticClassesIntoSingleClass(
+        this TreeNode<SemanticNode> root
+    )
+    {
+        var existingClass = root.FindWhere(t =>
+                t.Value.Kind == SyntaxKind.ClassDeclaration && t.Value.Name == "StaticHelpers"
+            )
+            .FirstOrDefault();
+        var methodsToMove = root.GetNonExtensionMethodsInExtensionClass();
+
+        foreach (var c in methodsToMove)
+        {
+            c.Value.Modifier = AccessModifier.Public;
+            c.RemoveSelf();
+        }
+
+        var declaration = "public class StaticHelpers {}";
+        if (existingClass != null)
+        {
+            methodsToMove.AddRange(existingClass.GetMethods().Select(t => t.tree).ToList());
+            existingClass.RemoveSelf();
+        }
+        var newClassTree = methodsToMove.WrapInDeclaration(declaration);
+        root.Children.Add(newClassTree);
+    }
+
+    public static TreeNode<SemanticNode> OrderCollectionValues(
+        this TreeNode<SemanticNode> originalTree
+    )
+    {
+        foreach (
+            var x in originalTree.FindWhere(t =>
+                SyntaxKindGroups.CollectionInitializerKinds.Contains(t.Value.Kind)
+            )
+        )
+        {
+            x.Children = x.Children.Interleave(t => t.Value.Value);
+        }
+        return originalTree;
+    }
+
+    public static void PullChildrenOutOfNamespace(
+        this TreeNode<SemanticNode> root,
+        List<TreeNode<SemanticNode>> usings,
+        TreeNode<SemanticNode> ns
+    )
+    {
+        var types = ns.FindSyntaxKinds(SyntaxKindGroups.NamespaceTypeChildren).ToList();
+        ns.RemoveSelf();
+        var nsUsing = usings.Where(t => t.Value.Name == ns.Value.Name).FirstOrDefault();
+        nsUsing.RemoveSelf();
+        root.Children.AddRange(types);
+    }
+
+    public static void PullChildrenOutOfNamespaces(this TreeNode<SemanticNode> root)
+    {
+        var namespaces = root.FindWhere(t => t.Value.Kind == SyntaxKind.NamespaceDeclaration)
+            .ToList();
+        var usings = root.FindWhere(t => t.Value.Kind == SyntaxKind.UsingDirective).ToList();
+        foreach (var ns in namespaces)
+        {
+            root.PullChildrenOutOfNamespace(usings, ns);
+        }
+    }
+
+    public static TreeNode<SemanticNode> ReloadFormatted(this TreeNode<SemanticNode> node)
+    {
+        var code = node.ToCode();
+        code = CSharpierFormatter.Format(code);
+        var ret = SemanticTree.DeserializeCode(code);
+        ret.GroupConsecutiveChildren(t => t.Value.HasName);
+        return ret;
+    }
+
+    public static void RemoveEmptyClasses(this TreeNode<SemanticNode> node)
+    {
+        var classes = node.FindClasses().Where(t => t.IsStaticClass).ToList();
+        var emptyClasses = classes.Where(t => !t.HasMethods).ToList();
+        foreach (var e in emptyClasses) { }
+
+        emptyClasses.ForEach(t => t.tree.RemoveSelf());
+    }
+
+    public static TreeNode<SemanticNode> RemoveNamespaces(this TreeNode<SemanticNode> tree)
+    {
+        var ns = tree.FindWhere(t => t.Value.Kind == SyntaxKind.NamespaceDeclaration).ToList();
+        ns.ForEach(t =>
+        {
+            t.Value.DeleteDeclaration();
+        });
+        return tree;
+    }
+
+    public static void RenameNamespaces(
+        this TreeNode<SemanticNode> tree,
+        Func<string, string> replace
+    )
+    {
+        var namespaces = tree
+            .Children.Where(t => t.Value.Kind == SyntaxKind.NamespaceDeclaration)
+            .ToList();
+        namespaces.ForEach(t =>
+        {
+            t.Value.Name = replace(t.Value.Name);
+        });
+        var usings = tree.Children.Where(t => t.Value.Kind == SyntaxKind.UsingDirective).ToList();
+        usings.ForEach(t => t.Value.Name = replace(t.Value.Name));
+        usings
+            .GroupBy(t => t.Value.Name)
+            .Where(t => t.Count() > 1)
+            .SelectMany(t => t.Skip(1))
+            .ForEach(t => t.Delete(DeleteType.NodeAndSubTree));
+    }
+
+    public static List<TreeNode<SemanticNode>> ReplaceExistingLowestLevelTypesFrom(
+        this TreeNode<SemanticNode> destination,
+        TreeNode<SemanticNode> source
+    )
+    {
+        var destByName = destination.GetLowestLevelTypes().ToDictionaryByFullName();
+        var newLowLevelTypes = new List<TreeNode<SemanticNode>>();
+        var sourceTypes = source.GetLowestLevelTypes();
+        foreach (var sourceNode in sourceTypes)
+        {
+            if (destByName.TryGetValue(sourceNode.Value.FullName, out var destNode))
+                destNode.ReplaceSelf(sourceNode);
+            else
+                newLowLevelTypes.Add(sourceNode);
+        }
+
+        return newLowLevelTypes;
+    }
+
+    public static void SaveFile(this TreeNode<SemanticNode> node, string filePath)
+    {
+        node.SerializeFile(filePath);
+    }
+
+    public static string Serialize(this TreeNode<SemanticNode>? root)
+    {
+        if (root == null)
+            return string.Empty;
+        var sb = new StringBuilder(8192 * 8);
+
+        void Visit(TreeNode<SemanticNode> node)
+        {
+            if (node.Value?.Text != null)
+                sb.Append(node.Value.Text);
+            foreach (var child in node.Children)
+                Visit(child);
+        }
+
+        Visit(root);
+        return sb.ToString();
+    }
+
+    public static void SerializeFile(this TreeNode<SemanticNode> node, string filePath)
+    {
+        node.ToFile(filePath);
+    }
+
+    public static bool ShouldDivideLargeClass(this TreeNode<SemanticNode> tree)
+    {
+        if (tree == null || tree.Value is not ClassNode classNode)
+            return false;
+
+        string className = classNode.Name ?? "Unknown";
+
+        int methodCount = tree.CountMethods();
+        int locCount = tree.CountLinesOfCode();
+
+        const int METHOD_THRESHOLD = 12;
+        const int LOC_THRESHOLD = 320;
+
+        bool isLarge = methodCount >= METHOD_THRESHOLD || locCount >= LOC_THRESHOLD;
+
+        return isLarge;
+    }
+
+    public static bool TestCompile(
+        this TreeNode<SemanticNode> node,
+        string projectPath,
+        string savePath = null
+    )
+    {
+        var code = node.ToCode();
+
+        if (savePath != null)
+            File.WriteAllText(savePath, code);
+        var ret = CompilationUtil.Compile(code, projectPath);
+        if (!ret.Success)
+            throw new Exception("FAILURE");
+        return ret.Success;
+    }
+
+    public static string ToCode(this TreeNode<SemanticNode> node)
+    {
+        var code = node.Serialize();
+        return code;
+    }
+
+    public static void ToFile(this TreeNode<SemanticNode> node, string filePath)
+    {
+        var code = node.ToCode();
+        code = code.NormalizeLineEndings();
+        File.WriteAllText(filePath, code);
+    }
+    public static void ToFormattedFile(this TreeNode<SemanticNode> node, string filePath)
+    {
+        var code = node.ToCode();
+        code = CSharpierFormatter.Format(code);
+        File.WriteAllText(filePath, code);
     }
 }
 
 public static class ExtensionsOfTreeNodeOfSyntaxElementNode
 {
-    public static TreeNode<SemanticNode> ToTreeSemanticNode(
-        this TreeNode<SyntaxElementNode> syntaxRoot
-    )
-    {
-        var tree = syntaxRoot.BuildTree();
-        tree.InitializeAllNodes();
-        return tree;
-    }
 
     public static TreeNode<SemanticNode> BuildTree(this TreeNode<SyntaxElementNode> syntaxNode)
     {
@@ -1887,18 +1877,18 @@ public static class ExtensionsOfTreeNodeOfSyntaxElementNode
 
         return treeNode;
     }
+    public static TreeNode<SemanticNode> ToTreeSemanticNode(
+        this TreeNode<SyntaxElementNode> syntaxRoot
+    )
+    {
+        var tree = syntaxRoot.BuildTree();
+        tree.InitializeAllNodes();
+        return tree;
+    }
 }
 
 public static class ExtensionsOfTreeNodeOfTokenNode
 {
-    public static TreeNode<SyntaxElementNode> ToTreeSyntaxElement(
-        this TreeNode<TokenNode>? tokenRoot
-    )
-    {
-        if (tokenRoot == null)
-            throw new ArgumentNullException(nameof(tokenRoot));
-        return tokenRoot.ToSyntaxElementTree();
-    }
 
     public static TreeNode<SyntaxElementNode> ToSyntaxElementTree(
         this TreeNode<TokenNode> tokenNode
@@ -1927,6 +1917,14 @@ public static class ExtensionsOfTreeNodeOfTokenNode
         for (int i = 0; i < siblings.Count - 1; i++)
             siblings[i].AddChild(siblings[i + 1]);
         return siblings[0];
+    }
+    public static TreeNode<SyntaxElementNode> ToTreeSyntaxElement(
+        this TreeNode<TokenNode>? tokenRoot
+    )
+    {
+        if (tokenRoot == null)
+            throw new ArgumentNullException(nameof(tokenRoot));
+        return tokenRoot.ToSyntaxElementTree();
     }
 }
 
@@ -2793,11 +2791,11 @@ public class SimpleMemberAccessNode : SemanticNode
 
 public class StaticHelpers
 {
-    public static bool NamesAreInvalid(string className, string interfaceName) =>
-        string.IsNullOrEmpty(className) || string.IsNullOrEmpty(interfaceName);
 
     public static void LogSuccessfulExtraction(string interfaceName, int methodCount) =>
         Console.WriteLine($"✓ Extracted {methodCount} methods → partial class for {interfaceName}");
+    public static bool NamesAreInvalid(string className, string interfaceName) =>
+        string.IsNullOrEmpty(className) || string.IsNullOrEmpty(interfaceName);
 }
 
 public class StructNode : TypeDeclarationNode
