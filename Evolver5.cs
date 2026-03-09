@@ -955,10 +955,6 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         TreeNode<SemanticNode> member
     )
     {
-        if (member.Value.Name == "b")
-        {
-            int bp = 0;
-        }
         parent.Value.MembersNode.AddChild(member);
     }
 
