@@ -3,7 +3,7 @@
  <PropertyGroup>
     <!-- CHANGED: Library instead of Exe -->
     <OutputType>Library</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>nullable</NoWarn>

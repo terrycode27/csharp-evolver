@@ -18,10 +18,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET 10
+      - name: Setup .NET 9 (from global.json)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0'     # safest & official way (auto-picks latest SDK 10.0.200 + matching runtime)
+          global-json-file: global.json   # ← respects your exact 9.0.200 version
 
       - name: Verify .NET SDK version
         run: |
