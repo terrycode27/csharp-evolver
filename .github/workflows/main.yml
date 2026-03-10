@@ -18,10 +18,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET 9 (from global.json)
-        uses: actions/setup-dotnet@v4
+      - name: Setup .NET 9 (explicit — fixes runner "not found" errors)
+        uses: actions/setup-dotnet@v5
         with:
-          global-json-file: global.json   # ← respects your exact 9.0.200 version
+          dotnet-version: 9.0.x
+          cache: true                    # speeds up restore/build on future runs
 
       - name: Verify .NET SDK version
         run: |
