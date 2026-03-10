@@ -1,13 +1,27 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
+ <PropertyGroup>
+    <!-- CHANGED: Library instead of Exe -->
+    <OutputType>Library</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>nullable</NoWarn> 
-    <LangVersion>preview</LangVersion>           <!-- optional: if you want latest C# features -->
-    <RootNamespace>Evolver5</RootNamespace>       <!-- optional but good practice -->
+    <NoWarn>nullable</NoWarn>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>Evolver5</RootNamespace>
+
+    <!-- NEW: NuGet package metadata (required for a good package) -->
+    <PackageId>Evolver5</PackageId>
+    <Version>1.0.0</Version> <!-- bump this on releases -->
+    <Authors>terrycode27</Authors>
+    <Company>terrycode27</Company>
+    <Description>Deserialize C# code, slice, dice, split, merge, query, refactor. Built with Roslyn for use with AI/Agentic/LLM assisted coding.</Description>
+    <PackageTags>roslyn;csharp;refactor;merge;ai;llm;code-generation</PackageTags>
+    <RepositoryUrl>https://github.com/terrycode27/csharp-evolver</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/terrycode27/csharp-evolver</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression> <!-- change if you use a different license -->
+    <IsPackable>true</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
 
  
