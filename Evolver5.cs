@@ -56,13 +56,14 @@ public class __Program
 
     class KnownProjectPaths
     {
-        public static _ProjectPaths Evolver5 => new("Evolver5");
+        public static _EntryPoint Evolver5 => new("Evolver5");
+       
     }
 }
 
-public partial class _ProjectPaths
+public partial class _EntryPoint
 {
-    public static _ProjectPaths Create(string baseNamespace) => new(baseNamespace);
+    public static _EntryPoint Create(string baseNamespace) => new(baseNamespace);
 
     public void ExtractFromNamespaces()
     {
@@ -166,7 +167,7 @@ public partial class _ProjectPaths
 
 
 
-    public _ProjectPaths(string baseNamespace, string root_directory = null)
+    public _EntryPoint(string baseNamespace, string root_directory = null)
     {
         if (root_directory == null)
             root_directory = AppDomain.CurrentDomain.GetSolutionBaseFolder();
@@ -1386,7 +1387,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
 
     public static void EmptyMemberDeclarationsContents(
         this TreeNode<SemanticNode> tree,
-        _ProjectPaths path
+        _EntryPoint path
     )
     {
         var list = tree.FindWhere(t => t.Value.Kind == SyntaxKind.Block).ToList();
@@ -1413,7 +1414,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
 
     public static void EmptyTypeDeclarationsContents(
         this TreeNode<SemanticNode> tree,
-        _ProjectPaths path
+        _EntryPoint path
     )
     {
         var list = tree.FindWhere(t => SyntaxKindGroups.TypeDeclarations.Contains(t.Value.Kind))
