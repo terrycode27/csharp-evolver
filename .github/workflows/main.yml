@@ -22,7 +22,8 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 9.0.x
-          cache: true                    # speeds up restore/build on future runs
+          # cache removed — this was causing the "Dependencies lock file is not found" error
+          # (your project has no packages.lock.json yet)
 
       - name: Verify .NET SDK version
         run: |
