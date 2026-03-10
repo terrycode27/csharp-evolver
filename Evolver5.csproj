@@ -21,6 +21,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression> <!-- change if you use a different license -->
     <IsPackable>true</IsPackable>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+<PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
  
@@ -53,9 +54,7 @@
 
 
   <ItemGroup>
-    <None Update="README.md">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+ 
     <None Update="_dependency\CSharpier\CSharpier.Core.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -76,6 +75,7 @@
   <!-- Optional: suppress noisy MSBuild warnings if they appear -->
   <PropertyGroup>
     <NoWarn>$(NoWarn);MSB3277</NoWarn> <!-- MSB3277 = assembly version conflict -->
+	
   </PropertyGroup>
 
 </Project>
