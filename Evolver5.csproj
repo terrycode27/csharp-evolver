@@ -53,6 +53,9 @@
 
 
   <ItemGroup>
+    <None Update="README.md">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="_dependency\CSharpier\CSharpier.Core.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
