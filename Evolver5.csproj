@@ -38,6 +38,7 @@
 
   <ItemGroup>
     <None Remove="Evolver5.csproj.vspscc" />
+	<None Include="..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 <ItemGroup>
