@@ -1,104 +1,113 @@
-name: NuGet Package & Publish with Auto SemVer
+name: Auto-increment minor & publish NuGet
 
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: write        # required to push version bump commit + tag
+  packages: write
+
 jobs:
-  pack-and-publish:
+  build-pack-publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read          # for checkout
-      packages: write         # for GitHub Packages publish
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0        # full history needed for semver calculation
+          fetch-depth: 0   # important so we can read tags & history
 
       - name: Setup .NET 9
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 9.0.x
 
-      - name: Determine version (auto SemVer on main, tag-based on tags)
-        id: semver
-        uses: PaulHatch/semantic-version@v5
-        with:
-          # Optional: customize patterns if you use different commit styles
-          major_pattern: "BREAKING CHANGE:|.+!"
-          minor_pattern: "^feat(\\(.*\\))?:"
-          format: "${major}.${minor}.${patch}${prerelease}${buildmetadata}"
-          # For main: add prerelease suffix + increment
-          prerelease: |
-            ${{ github.ref_type != 'tag' && '-main' || '' }}
-          # Optional: bump every commit even without feat/fix (set to true for dev always-unique)
-          bump_each_commit: false
-          # Output debug info
-          enable_prerelease_mode: ${{ github.ref_type != 'tag' }}
-          # Tag prefix (we use 'v' so match it)
-          tag_prefix: v
+      - name: Show current .NET version
+        run: dotnet --version
 
-      - name: Show computed version
+      # ────────────────────────────────────────────────
+      #  Decide version bump strategy
+      # ────────────────────────────────────────────────
+      - name: Determine version increment
+        id: version
         run: |
-          echo "Version: ${{ steps.semver.outputs.version }}"
-          echo "Major:   ${{ steps.semver.outputs.major }}"
-          echo "Minor:   ${{ steps.semver.outputs.minor }}"
-          echo "Patch:   ${{ steps.semver.outputs.patch }}"
+          # Read current version from .csproj (assumes <Version>1.2.3</Version>)
+          CURRENT=$(grep -oP '(?<=<Version>).*?(?=</Version>)' Evolver5.csproj || echo "0.0.0")
+          
+          if [[ "$CURRENT" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+            MAJOR=${BASH_REMATCH[1]}
+            MINOR=${BASH_REMATCH[2]}
+            PATCH=${BASH_REMATCH[3]}
+            
+            # Always increment minor on main (you can change logic here)
+            NEW_MINOR=$((MINOR + 1))
+            NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
+          else
+            # fallback — first release
+            NEW_VERSION="1.0.0"
+          fi
 
-      - name: Restore dependencies
+          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "Using version: ${NEW_VERSION}"
+
+      # ────────────────────────────────────────────────
+      #  Update .csproj with new version
+      # ────────────────────────────────────────────────
+      - name: Bump version in .csproj
+        if: github.ref == 'refs/heads/main'
+        run: |
+          sed -i "s|<Version>.*</Version>|<Version>${{ steps.version.outputs.new_version }}</Version>|" Evolver5.csproj
+          
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add Evolver5.csproj
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]" || echo "No changes to commit"
+          git push
+
+      # ────────────────────────────────────────────────
+      #  Build & Pack
+      # ────────────────────────────────────────────────
+      - name: Restore
         run: dotnet restore Evolver5.csproj
 
       - name: Build
         run: dotnet build Evolver5.csproj --no-restore --configuration Release
 
-      - name: Pack NuGet (with symbols)
+      - name: Pack
         run: |
           dotnet pack Evolver5.csproj \
             --no-build \
             --configuration Release \
             -o ./nupkg \
-            -p:PackageVersion=${{ steps.semver.outputs.version }} \
-            -p:IncludeSymbols=true \
-            -p:SymbolPackageFormat=snupkg
+            -p:PackageVersion=${{ steps.version.outputs.new_version || '0.0.0-dev' }}
 
-      - name: Debug — list packages
-        run: ls -la ./nupkg
-
-      - name: Upload artifacts
+      - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nuget-packages
-          path: ./nupkg/*.nupkg ./nupkg/*.snupkg
-          if-no-files-found: error
+          name: nuget-package
+          path: ./nupkg/*.nupkg
+          if-no-files-found: warn
 
-      # Publish to GitHub Packages (main + tags)
-      - name: Publish to GitHub Packages
+      # ────────────────────────────────────────────────
+      #  Publish — only on main
+      # ────────────────────────────────────────────────
+      - name: Publish to nuget.org
+        if: github.ref == 'refs/heads/main'
         run: |
-          echo "Pushing ${{ steps.semver.outputs.version }} to GitHub Packages..."
+          dotnet nuget push ./nupkg/*.nupkg \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      # Optional: also publish to GitHub Packages (if you want both)
+      - name: Publish to GitHub Packages
+        if: github.ref == 'refs/heads/main'
+        run: |
           dotnet nuget push ./nupkg/*.nupkg \
             --api-key ${{ secrets.GITHUB_TOKEN }} \
             --source https://nuget.pkg.github.com/terrycode27/index.json \
-            --skip-duplicate \
-            --verbosity normal
-
-      # Publish to nuget.org (only stable tags — no prereleases)
-      - name: Publish to nuget.org
-        if: github.ref_type == 'tag'
-        env:
-          NUGET_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          if [ -z "$NUGET_KEY" ]; then
-            echo "::warning::NUGET_API_KEY not set → skipping nuget.org"
-            exit 0
-          fi
-          echo "Pushing ${{ steps.semver.outputs.version }} to nuget.org..."
-          dotnet nuget push ./nupkg/*.nupkg \
-            --api-key "$NUGET_KEY" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate \
-            --verbosity normal
+            --skip-duplicate
