@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write          # needed for GitHub Packages
+      packages: write
 
     steps:
       - name: Checkout code
@@ -21,26 +21,24 @@ jobs:
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.200'   # Pin to current latest stable patch (Mar 10, 2026)
-          # Alternative (auto-latest): '10.0.x' — should now work, but pin avoids edge cases
-          # Or '10.0' for major-version auto-resolution
+          dotnet-version: '10.0'     # safest & official way (auto-picks latest SDK 10.0.200 + matching runtime)
 
       - name: Verify .NET SDK version
         run: |
-          echo "Installed .NET SDK version:"
+          echo "Installed .NET SDK:"
           dotnet --version
           echo ""
           dotnet --info
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore Evolver5.csproj
 
       - name: Build project
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build Evolver5.csproj --no-restore --configuration Release
 
       - name: Pack NuGet package
         run: |
-          dotnet pack --no-build --configuration Release -o ./nupkg \
+          dotnet pack Evolver5.csproj --no-build --configuration Release -o ./nupkg \
             -p:PackageVersion=${{ github.ref_type == 'tag' && github.ref_name || '0.0.0-dev' }}
 
       - name: Upload NuGet artifact (for manual download / inspection)
@@ -50,7 +48,7 @@ jobs:
           path: ./nupkg/*.nupkg
           if-no-files-found: warn
 
-      # Publish to GitHub Packages (on main branch pushes OR tags)
+      # Publish to GitHub Packages (on main OR tags)
       - name: Publish to GitHub Packages
         if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
         run: |
@@ -59,7 +57,7 @@ jobs:
             --source https://nuget.pkg.github.com/terrycode27/index.json \
             --skip-duplicate
 
-      # Publish to nuget.org (only on real version tags like v1.2.3)
+      # Publish to nuget.org (only on real version tags)
       - name: Publish to nuget.org
         if: github.ref_type == 'tag'
         run: |
