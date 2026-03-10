@@ -21,7 +21,9 @@ jobs:
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'   # resolves to latest patch (currently ~10.0.200 as of Mar 2026)
+          dotnet-version: '10.0.200'   # Pin to current latest stable patch (Mar 10, 2026)
+          # Alternative (auto-latest): '10.0.x' — should now work, but pin avoids edge cases
+          # Or '10.0' for major-version auto-resolution
 
       - name: Verify .NET SDK version
         run: |
