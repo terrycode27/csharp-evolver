@@ -49,11 +49,10 @@ jobs:
             --source https://nuget.pkg.github.com/terrycode27/index.json \
             --skip-duplicate
 
-   
       - name: Publish to nuget.org
-       if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag'
         run: |
           dotnet nuget push ./nupkg/*.nupkg \
-             --api-key ${{ secrets.NUGET_API_KEY }} \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
