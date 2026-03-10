@@ -1,113 +1,68 @@
-name: Auto-increment minor & publish NuGet
+name: NuGet Package & Publish
 
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]          # still triggers on tags (but version is forced to 0.1.0)
   pull_request:
     branches: [ main ]
 
-permissions:
-  contents: write        # required to push version bump commit + tag
-  packages: write
-
 jobs:
-  build-pack-publish:
+  pack-and-publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # important so we can read tags & history
 
-      - name: Setup .NET 9
+      - name: Setup .NET 9 (explicit — fixes runner "not found" errors)
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 9.0.x
 
-      - name: Show current .NET version
-        run: dotnet --version
-
-      # ────────────────────────────────────────────────
-      #  Decide version bump strategy
-      # ────────────────────────────────────────────────
-      - name: Determine version increment
-        id: version
+      - name: Verify .NET SDK version
         run: |
-          # Read current version from .csproj (assumes <Version>1.2.3</Version>)
-          CURRENT=$(grep -oP '(?<=<Version>).*?(?=</Version>)' Evolver5.csproj || echo "0.0.0")
-          
-          if [[ "$CURRENT" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
-            MAJOR=${BASH_REMATCH[1]}
-            MINOR=${BASH_REMATCH[2]}
-            PATCH=${BASH_REMATCH[3]}
-            
-            # Always increment minor on main (you can change logic here)
-            NEW_MINOR=$((MINOR + 1))
-            NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
-          else
-            # fallback — first release
-            NEW_VERSION="1.0.0"
-          fi
+          echo "Installed .NET SDK:"
+          dotnet --version
+          echo ""
+          dotnet --info
 
-          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-          echo "Using version: ${NEW_VERSION}"
-
-      # ────────────────────────────────────────────────
-      #  Update .csproj with new version
-      # ────────────────────────────────────────────────
-      - name: Bump version in .csproj
-        if: github.ref == 'refs/heads/main'
-        run: |
-          sed -i "s|<Version>.*</Version>|<Version>${{ steps.version.outputs.new_version }}</Version>|" Evolver5.csproj
-          
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git add Evolver5.csproj
-          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]" || echo "No changes to commit"
-          git push
-
-      # ────────────────────────────────────────────────
-      #  Build & Pack
-      # ────────────────────────────────────────────────
-      - name: Restore
+      - name: Restore dependencies
         run: dotnet restore Evolver5.csproj
 
-      - name: Build
+      - name: Build project
         run: dotnet build Evolver5.csproj --no-restore --configuration Release
 
-      - name: Pack
+      - name: Pack NuGet package with fixed version 0.1.0
         run: |
-          dotnet pack Evolver5.csproj \
-            --no-build \
-            --configuration Release \
-            -o ./nupkg \
-            -p:PackageVersion=${{ steps.version.outputs.new_version || '0.0.0-dev' }}
+          dotnet pack Evolver5.csproj --no-build --configuration Release -o ./nupkg \
+            -p:PackageVersion=0.1.0 \
+            -p:Version=0.1.0
 
-      - name: Upload package artifact
+      - name: Upload NuGet artifact (for manual download / inspection)
         uses: actions/upload-artifact@v4
         with:
-          name: nuget-package
+          name: nuget-packages
           path: ./nupkg/*.nupkg
           if-no-files-found: warn
 
-      # ────────────────────────────────────────────────
-      #  Publish — only on main
-      # ────────────────────────────────────────────────
-      - name: Publish to nuget.org
-        if: github.ref == 'refs/heads/main'
-        run: |
-          dotnet nuget push ./nupkg/*.nupkg \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
-
-      # Optional: also publish to GitHub Packages (if you want both)
+      # Publish to GitHub Packages (on main OR tags) — allows overwrite
       - name: Publish to GitHub Packages
-        if: github.ref == 'refs/heads/main'
+        if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
         run: |
           dotnet nuget push ./nupkg/*.nupkg \
             --api-key ${{ secrets.GITHUB_TOKEN }} \
             --source https://nuget.pkg.github.com/terrycode27/index.json \
-            --skip-duplicate
+            --skip-duplicate false
+
+      # Publish to nuget.org (only on real version tags) — allows overwrite
+      - name: Publish to nuget.org
+        if: github.ref_type == 'tag'
+        run: |
+          dotnet nuget push ./nupkg/*.nupkg \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate false
