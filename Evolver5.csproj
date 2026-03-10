@@ -7,12 +7,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>nullable</NoWarn>
-    <LangVersion>preview</LangVersion>
+    <LangVersion>13.0</LangVersion>
     <RootNamespace>Evolver5</RootNamespace>
 
     <!-- NEW: NuGet package metadata (required for a good package) -->
     <PackageId>Evolver5</PackageId>
-    <Version>1.0.0</Version> <!-- bump this on releases -->
     <Authors>terrycode27</Authors>
     <Company>terrycode27</Company>
     <Description>Deserialize C# code, slice, dice, split, merge, query, refactor. Built with Roslyn for use with AI/Agentic/LLM assisted coding.</Description>
