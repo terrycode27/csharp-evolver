@@ -1,9 +1,9 @@
-name: NuGet Package & Publish
+name: NuGet Package & Publish with Auto SemVer
 
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]          # e.g. v1.2.3 triggers a real release
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
@@ -11,59 +11,94 @@ jobs:
   pack-and-publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      packages: write
+      contents: read          # for checkout
+      packages: write         # for GitHub Packages publish
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # full history needed for semver calculation
 
-      - name: Setup .NET 9 (explicit — fixes runner "not found" errors)
+      - name: Setup .NET 9
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 9.0.x
-          # cache removed — this was causing the "Dependencies lock file is not found" error
-          # (your project has no packages.lock.json yet)
 
-      - name: Verify .NET SDK version
+      - name: Determine version (auto SemVer on main, tag-based on tags)
+        id: semver
+        uses: PaulHatch/semantic-version@v5
+        with:
+          # Optional: customize patterns if you use different commit styles
+          major_pattern: "BREAKING CHANGE:|.+!"
+          minor_pattern: "^feat(\\(.*\\))?:"
+          format: "${major}.${minor}.${patch}${prerelease}${buildmetadata}"
+          # For main: add prerelease suffix + increment
+          prerelease: |
+            ${{ github.ref_type != 'tag' && '-main' || '' }}
+          # Optional: bump every commit even without feat/fix (set to true for dev always-unique)
+          bump_each_commit: false
+          # Output debug info
+          enable_prerelease_mode: ${{ github.ref_type != 'tag' }}
+          # Tag prefix (we use 'v' so match it)
+          tag_prefix: v
+
+      - name: Show computed version
         run: |
-          echo "Installed .NET SDK:"
-          dotnet --version
-          echo ""
-          dotnet --info
+          echo "Version: ${{ steps.semver.outputs.version }}"
+          echo "Major:   ${{ steps.semver.outputs.major }}"
+          echo "Minor:   ${{ steps.semver.outputs.minor }}"
+          echo "Patch:   ${{ steps.semver.outputs.patch }}"
 
       - name: Restore dependencies
         run: dotnet restore Evolver5.csproj
 
-      - name: Build project
+      - name: Build
         run: dotnet build Evolver5.csproj --no-restore --configuration Release
 
-      - name: Pack NuGet package
+      - name: Pack NuGet (with symbols)
         run: |
-          dotnet pack Evolver5.csproj --no-build --configuration Release -o ./nupkg \
-            -p:PackageVersion=${{ github.ref_type == 'tag' && github.ref_name || '0.0.0-dev' }}
+          dotnet pack Evolver5.csproj \
+            --no-build \
+            --configuration Release \
+            -o ./nupkg \
+            -p:PackageVersion=${{ steps.semver.outputs.version }} \
+            -p:IncludeSymbols=true \
+            -p:SymbolPackageFormat=snupkg
 
-      - name: Upload NuGet artifact (for manual download / inspection)
+      - name: Debug — list packages
+        run: ls -la ./nupkg
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: nuget-packages
-          path: ./nupkg/*.nupkg
-          if-no-files-found: warn
+          path: ./nupkg/*.nupkg ./nupkg/*.snupkg
+          if-no-files-found: error
 
-      # Publish to GitHub Packages (on main OR tags)
+      # Publish to GitHub Packages (main + tags)
       - name: Publish to GitHub Packages
-        if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
         run: |
+          echo "Pushing ${{ steps.semver.outputs.version }} to GitHub Packages..."
           dotnet nuget push ./nupkg/*.nupkg \
             --api-key ${{ secrets.GITHUB_TOKEN }} \
             --source https://nuget.pkg.github.com/terrycode27/index.json \
-            --skip-duplicate
+            --skip-duplicate \
+            --verbosity normal
 
-      # Publish to nuget.org (only on real version tags)
+      # Publish to nuget.org (only stable tags — no prereleases)
       - name: Publish to nuget.org
         if: github.ref_type == 'tag'
+        env:
+          NUGET_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
+          if [ -z "$NUGET_KEY" ]; then
+            echo "::warning::NUGET_API_KEY not set → skipping nuget.org"
+            exit 0
+          fi
+          echo "Pushing ${{ steps.semver.outputs.version }} to nuget.org..."
           dotnet nuget push ./nupkg/*.nupkg \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --api-key "$NUGET_KEY" \
             --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+            --skip-duplicate \
+            --verbosity normal
