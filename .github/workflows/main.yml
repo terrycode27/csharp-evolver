@@ -47,7 +47,7 @@ jobs:
             NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
           else
             # fallback — first release
-            NEW_VERSION="1.0.0"
+            NEW_VERSION="2.0.0"
           fi
 
           echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
