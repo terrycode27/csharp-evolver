@@ -24,14 +24,13 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-//
-public class __Program
+
+public partial class __Program
 {
-    public static void Main()
+    public static void NotMain()
     {
         var path = KnownProjectPaths.Evolver5;
-        var tree = path.LoadTree();
-
+        var tree = path.LoadTreeMain();
         SelfTest();
         MergeTest();
     }
@@ -54,20 +53,20 @@ public class __Program
         path.GroupByModifierKindName();
     }
 
-    class KnownProjectPaths
-    {
-        public static _EntryPoint Evolver5 => new("Evolver5");
-       
-    }
+ 
 }
-
 public partial class _EntryPoint
 {
+    public TreeNode<SemanticNode> LoadTreeMain()
+    {
+        return LoadTreeFromPath(ConsolidatedFilePath);
+    }
+
     public static _EntryPoint Create(string baseNamespace) => new(baseNamespace);
 
     public void ExtractFromNamespaces()
     {
-        var root = LoadTree();
+        var root = LoadTreeMain();
         root.PullChildrenOutOfNamespaces();
         root.TestCompile(ProjectFilePath);
         root.ToFile(ConsolidatedFilePath);
@@ -95,7 +94,7 @@ public partial class _EntryPoint
 
     public void GroupByClassHierarchy()
     {
-        var tree = LoadTree();
+        var tree = LoadTreeMain();
         var classes = tree.FindClasses();
         var grouped = BuildClassHierarchy(classes);
         tree.Children.Clear();
@@ -105,7 +104,7 @@ public partial class _EntryPoint
 
     public void GroupByModifierKindName()
     {
-        var originalTree = LoadTree();
+        var originalTree = LoadTreeMain();
         var peek = originalTree.GroupByModifierKindName();
         var treeWithConsecutiveGroups = peek.Tree;
         treeWithConsecutiveGroups.TestCompile(ProjectFilePath, ConsolidatedFilePath);
@@ -113,7 +112,7 @@ public partial class _EntryPoint
 
     public void GroupStaticExtensionMethods()
     {
-        var root = LoadTree();
+        var root = LoadTreeMain();
         root.MoveNonExtensionStaticMethodsInStaticClassesIntoSingleClass();
         root.GroupStaticExtensionMethods();
         root = root.ReloadFormatted();
@@ -123,10 +122,7 @@ public partial class _EntryPoint
         root.SaveFile(this.ConsolidatedFilePath);
     }
 
-    public TreeNode<SemanticNode> LoadTree()
-    {
-        return LoadTreeFromPath(ConsolidatedFilePath);
-    }
+ 
 
     public TreeNode<SemanticNode> LoadTree(string name, string subdir = null)
     {
@@ -137,13 +133,12 @@ public partial class _EntryPoint
     public TreeNode<SemanticNode> LoadTreeFromPath(string fullPath)
     {
         var tree = SemanticTree.DeserializeFile(fullPath);
-        tree = tree.GroupConsecutiveChildren(t => t.Value.HasName);
         return tree;
     }
 
     public void OrderCollectionValues()
     {
-        var originalTree = LoadTree();
+        var originalTree = LoadTreeMain();
         var treeWithConsecutiveGroups = originalTree.OrderCollectionValues();
         treeWithConsecutiveGroups.TestCompile(ProjectFilePath, ConsolidatedFilePath);
     }
@@ -152,7 +147,7 @@ public partial class _EntryPoint
 
     public void RefactorLargeClassIntoPartialsWithInterfaces(string className)
     {
-        var tree = LoadTree();
+        var tree = LoadTreeMain();
         tree.DivideIntoPartialClassesByInterfaces(className);
         tree.GroupByModifierKindName();
         tree.ToFormattedFile(ConsolidatedFilePath);
@@ -916,7 +911,7 @@ public static class ExtensionsOfListOfTreeNodeOfSemanticNode
         string declaration
     )
     {
-        var root = SemanticTree.DeserializeCode(declaration);
+        var root = SemanticTree.DeserializeDeclaration(declaration);
         var body = root.FindWhere(t => t.Value.Kind == SyntaxKind.OpenBraceToken).First();
         foreach (var m in methods.OrderBy(m => m.Value.Name))
         {
@@ -1312,10 +1307,17 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         DeleteType deleteType = DeleteType.SingleNode
     )
     {
-        return tree.DeleteKinds(new HashSet<SyntaxKind>() { kind }, deleteType);
+        return tree.DeleteKindsSeek(new HashSet<SyntaxKind>() { kind }, deleteType);
     }
-
-    public static IEnumerable<TreeNode<SemanticNode>> DeleteKinds(
+    public static List<TreeNode<SemanticNode>> DeleteKinds(
+       this TreeNode<SemanticNode> tree,
+       HashSet<SyntaxKind> kinds,
+       DeleteType deleteType = DeleteType.SingleNode
+   )
+    {
+        return tree.DeleteKindsSeek(kinds).ToList();
+    }
+    public static IEnumerable<TreeNode<SemanticNode>> DeleteKindsSeek(
         this TreeNode<SemanticNode> tree,
         HashSet<SyntaxKind> kinds,
         DeleteType deleteType = DeleteType.SingleNode
@@ -1447,6 +1449,19 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
             t.RemoveSelf();
         });
         return tree;
+    }
+
+    public static void ExtractFromNamespaces(
+        this TreeNode<SemanticNode> root,
+        List<TreeNode<SemanticNode>> usings,
+        TreeNode<SemanticNode> ns
+    )
+    {
+        var types = ns.FindSyntaxKinds(SyntaxKindGroups.NamespaceTypeChildren).ToList();
+        ns.RemoveSelf();
+        var nsUsing = usings.Where(t => t.Value.Name == ns.Value.Name).FirstOrDefault();
+        nsUsing.RemoveSelf();
+        root.Children.AddRange(types);
     }
 
     public static List<ClassNode> FindClasses(this TreeNode<SemanticNode> tree)
@@ -1919,19 +1934,6 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         return originalTree;
     }
 
-    public static void ExtractFromNamespaces(
-        this TreeNode<SemanticNode> root,
-        List<TreeNode<SemanticNode>> usings,
-        TreeNode<SemanticNode> ns
-    )
-    {
-        var types = ns.FindSyntaxKinds(SyntaxKindGroups.NamespaceTypeChildren).ToList();
-        ns.RemoveSelf();
-        var nsUsing = usings.Where(t => t.Value.Name == ns.Value.Name).FirstOrDefault();
-        nsUsing.RemoveSelf();
-        root.Children.AddRange(types);
-    }
-
     public static void PullChildrenOutOfNamespaces(this TreeNode<SemanticNode> root)
     {
         var namespaces = root.FindWhere(t => t.Value.Kind == SyntaxKind.NamespaceDeclaration)
@@ -1948,7 +1950,6 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         var code = node.ToCode();
         code = CSharpierFormatter.Format(code);
         var ret = SemanticTree.DeserializeCode(code);
-        ret.GroupConsecutiveChildren(t => t.Value.HasName);
         return ret;
     }
 
@@ -2255,10 +2256,32 @@ public class InterfaceNode : TypeDeclarationNode
 
     protected override SyntaxKind? GetTypeSpecificKeyword() => SyntaxKind.InterfaceKeyword;
 }
+public partial class KnownProjectPaths
+{
+    public static _EntryPoint Evolver5 => new("Evolver5");
+ 
+}
 
 public class MethodNode : ParameterizedMemberWithBodyNode
 {
-    // Add this new method to the MethodNode class (right after ConvertToStaticExtension())
+    public override string FullName
+    {
+        get
+        {
+            return  base.FullName + String.Join('_', GetParameterTypeNames());
+        }
+    }
+    IEnumerable<ParameterNode> Parameters => tree.FindWhere(t => t.Value.Kind == SyntaxKind.Parameter).Select(t => (ParameterNode)t.Value);
+    public List<string> GetParameterTypeNames()
+    {
+        if (ParameterList == null || ParameterList.Parameters.Count == 0)
+            return new List<string>();
+
+        return ParameterList.Parameters
+            .Select(p => p.TypeText?.Trim() ?? string.Empty)
+            .Where(t => !string.IsNullOrEmpty(t))
+            .ToList();
+    }
     public void ConvertFromStaticExtension()
     {
         if (!IsStatic || !IsExtension)
@@ -2799,7 +2822,7 @@ public abstract class SemanticNode : BaseNode<SemanticNode>
     {
         get { return !this.tree.FindWhere(t => t.Value.HasName).Skip(1).Any(); }
     }
-    public string FullName
+    public virtual string FullName
     {
         get
         {
@@ -2886,9 +2909,17 @@ public class SemanticTree : ISerializeCode<SemanticNode>
         var serializer = new SemanticTree();
         if (fmt == true)
             code = CSharpierFormatter.Format(code);
+        var ret= serializer.Deserialize(code);
+        ret=ret.GroupConsecutiveChildren(t => t.Value.HasName);
+        return ret;
+    }
+    public static TreeNode<SemanticNode> DeserializeDeclaration(string code, bool fmt = false)
+    {
+        var serializer = new SemanticTree();
+        if (fmt == true)
+            code = CSharpierFormatter.Format(code);
         return serializer.Deserialize(code);
     }
-
     public static TreeNode<SemanticNode> DeserializeFile(string file, bool fmt = false)
     {
         var code = File.ReadAllText(file);
