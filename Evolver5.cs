@@ -2,6 +2,7 @@ using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxTokenParser;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.MSBuild;
@@ -18,6 +19,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics.X86;
 using System.Runtime.Loader;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -25,16 +27,19 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
+
 public partial class __Program
 {
-    public static void NotMain()
+    public static void Main()
     {
-        var path = KnownProjectPaths.Evolver5;
-        var tree = path.LoadTreeMain();
         SelfTest();
-        MergeTest();
     }
-
+    static void CompareInterfaces()
+    {
+        var files = new List<string>() { "interfaces.cs", "interfaces_grok.cs" };
+        var path = KnownProjectPaths.Evolver5;
+        files.Select(t => path.LoadTreeFromCodePath(t)).ToList().CompareObjectCount();
+    }
     static void MergeTest()
     {
         var path = KnownProjectPaths.Evolver5;
@@ -51,197 +56,136 @@ public partial class __Program
         var path = KnownProjectPaths.Evolver5;
         path.TestSemanticSerializer();
         path.GroupByModifierKindName();
+
     }
 
- 
 }
-public partial class _EntryPoint
+public static class _NewCode
 {
-    public TreeNode<SemanticNode> LoadTreeMain()
+    public static void CompareObjectCount(this List<TreeNode<SemanticNode>> treeNodes)
     {
-        return LoadTreeFromPath(ConsolidatedFilePath);
+        var lists = treeNodes.Select(t => t.GetNamedNodeList().Where(t => !(t is AttributeNode)).Select(t => t.FullName).ToList()).ToList();
+        var res = lists.CompareCollections().ToList();
+        var onlyExistInOne = res
+       .Where(r => r.Appearances == 1)
+       .ToList().First();
     }
 
-    public static _EntryPoint Create(string baseNamespace) => new(baseNamespace);
-
-    public void ExtractFromNamespaces()
+}
+public static class AddAttributeExtensions
+{
+    public static void AddAttribute(this NamedNode named, string attributeString)
     {
-        var root = LoadTreeMain();
-        root.PullChildrenOutOfNamespaces();
-        root.TestCompile(ProjectFilePath);
-        root.ToFile(ConsolidatedFilePath);
+        if (!ShouldAddAttribute(named, attributeString))
+            return;
+        var sw = new StringWriter();
+
+        sw.WriteLine(attributeString);
+     
+        string normalized = sw.ToString();
+        var attrNode = BuildAttributeNode(normalized);
+        named.tree.InsertBefore(attrNode);
+    }
+    public static void AddClassAttribute(this NamedNode named,string className)
+    {
+        named.AddAttribute($"[ClassDocumentation(\"{className}\")]");
+    }
+    public static void AddDocAttribute(this NamedNode named,string doc=null)
+    {
+        named.AddAttribute($"[Documentation(\"{doc}\")]");
+    }
+   
+    public static void AddUsings(this TreeNode<SemanticNode> root,List<UsingDirectiveNode> usings)
+    {
+        root.Children.InsertRange(0, usings.Select(t => t.tree));
     }
 
-    public void Format()
-    {
-        var code = File.ReadAllText(ConsolidatedFilePath);
-        code = CSharpierFormatter.Format(code);
-        File.WriteAllText(ConsolidatedFilePath, code);
-    }
-
-    public string GetFilePath(string name, string subdir)
-    {
-        if (!String.IsNullOrEmpty(subdir))
-            subdir = $@"{subdir}\";
-        var ret = Path.Combine(RootDirectory, $"{subdir}{BaseNamespace}_{name}.cs");
-        return ret;
-    }
-
-    public string GetTestFilePath(int i)
-    {
-        return Path.Combine(RootDirectory, $"{BaseNamespace}_test_{i}.cs");
-    }
-
-    public void GroupByClassHierarchy()
-    {
-        var tree = LoadTreeMain();
-        var classes = tree.FindClasses();
-        var grouped = BuildClassHierarchy(classes);
-        tree.Children.Clear();
-        grouped.ForEach(tree.AddChild);
-        tree.ToFormattedFile(TestFilePath);
-    }
-
-    public void GroupByModifierKindName()
-    {
-        var originalTree = LoadTreeMain();
-        var peek = originalTree.GroupByModifierKindName();
-        var treeWithConsecutiveGroups = peek.Tree;
-        treeWithConsecutiveGroups.TestCompile(ProjectFilePath, ConsolidatedFilePath);
-    }
-
-    public void GroupStaticExtensionMethods()
-    {
-        var root = LoadTreeMain();
-        root.MoveNonExtensionStaticMethodsInStaticClassesIntoSingleClass();
-        root.GroupStaticExtensionMethods();
-        root = root.ReloadFormatted();
-        // root.ToFormattedFile(this.ConsolidatedFilePath);
-        //root = LoadTree();
-        root.GroupByModifierKindName();
-        root.SaveFile(this.ConsolidatedFilePath);
-    }
 
  
 
-    public TreeNode<SemanticNode> LoadTree(string name, string subdir = null)
+    private static TreeNode<SemanticNode> BuildAttributeNode(string attributeText)
     {
-        var loadFile = GetFilePath(name, subdir);
-        return LoadTreeFromPath(loadFile);
+        var element = new SyntaxElementNode(SyntaxKind.AttributeList, attributeText);
+        var semantic = new UnknownNode(element);
+        var node = new TreeNode<SemanticNode>(semantic);
+        semantic.SetTreeNode(node);
+        return node;
+    }
+    private static TreeNode<SemanticNode>? FindFirstSignificantToken(TreeNode<SemanticNode> root)
+    {
+        return root.Children.FirstOrDefault(c =>
+            !SyntaxKindGroups.WhitespaceTrivia.Contains(c.Value.Kind) &&
+            c.Value.Kind != SyntaxKind.AttributeList);
     }
 
-    public TreeNode<SemanticNode> LoadTreeFromPath(string fullPath)
+    private static bool ShouldAddAttribute(NamedNode named, string attributeString)
     {
-        var tree = SemanticTree.DeserializeFile(fullPath);
-        return tree;
+        return named != null
+            && named.tree != null
+            && !string.IsNullOrWhiteSpace(attributeString);
+    }
+}
+public class AttributeListNode : SemanticNode
+{
+    public override void AttachChild(SemanticNode child)
+    {
+        if (child is AttributeNode attr)
+            Attributes.Add(attr);
     }
 
-    public void OrderCollectionValues()
+    /// <summary>
+    /// Returns true if this [AttributeList] contains the given attribute name
+    /// (works whether you pass "ClassDocumentation" or "ClassDocumentationAttribute").
+    /// </summary>
+    public bool Contains(string name)
     {
-        var originalTree = LoadTreeMain();
-        var treeWithConsecutiveGroups = originalTree.OrderCollectionValues();
-        treeWithConsecutiveGroups.TestCompile(ProjectFilePath, ConsolidatedFilePath);
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+
+        string search = StripAttributeSuffix(name);
+
+        return Attributes.Any(a =>
+            string.Equals(StripAttributeSuffix(a.Name ?? ""), search, StringComparison.Ordinal));
     }
 
+    public AttributeListNode(SyntaxElementNode b)
+        : base(b) { }
 
+    public List<AttributeNode> Attributes { get; } = new();
 
-    public void RefactorLargeClassIntoPartialsWithInterfaces(string className)
+    private static string StripAttributeSuffix(string input)
     {
-        var tree = LoadTreeMain();
-        tree.DivideIntoPartialClassesByInterfaces(className);
-        tree.GroupByModifierKindName();
-        tree.ToFormattedFile(ConsolidatedFilePath);
-    }
+        if (string.IsNullOrEmpty(input))
+            return input;
 
-    public void TestSemanticSerializer()
+        const string suffix = "Attribute";
+        return input.EndsWith(suffix, StringComparison.Ordinal)
+            ? input.Substring(0, input.Length - suffix.Length)
+            : input;
+    }
+}
+
+public class AttributeNode : NamedNode
+{
+
+    public override void SetNameNode()
     {
-        var serializer = new SemanticTree();
-        var fileGen = new FileGen<SemanticNode>(serializer);
-        fileGen.TestRoundTripFile(ConsolidatedFilePath);
+        // Exact same robust name extraction used by MethodNode/PropertyNode
+        NameNode = tree.FindWhereStop(
+            t => t.Value.Kind == SyntaxKind.IdentifierToken,
+            t => t.Value.Kind is SyntaxKind.OpenParenToken
+                 or SyntaxKind.CloseBracketToken
+                 or SyntaxKind.CommaToken)
+            .FirstOrDefault();
     }
-
-
-
-    public _EntryPoint(string baseNamespace, string root_directory = null)
-    {
-        if (root_directory == null)
-            root_directory = AppDomain.CurrentDomain.GetSolutionBaseFolder();
-        this.root_directory = root_directory;
-
-        if (string.IsNullOrWhiteSpace(baseNamespace))
-            throw new ArgumentException("Base namespace cannot be empty.", nameof(baseNamespace));
-
-        BaseNamespace = baseNamespace.Trim();
-
-        ProjectFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}.csproj");
-        ConsolidatedFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}.cs");
-        TestFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_test.cs");
-        ClassFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Class_Prefix}.cs");
-        MethodFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Method_Prefix}.cs");
-    }
-
-    public static string Class_Prefix = "Class";
-    public static string Consolidated_Prefix = "";
-    public static string Method_Prefix = "Method";
-    public static string one_class_per_file_namespace = "CF";
-    public static string one_namespace_per_file_namespace = "NF";
-
-    public string BaseNamespace { get; }
-    public string ClassFilePath { get; }
-    public string ConsolidatedFilePath { get; }
-    public string MethodFilePath { get; }
-
-    public string NamespaceConsolidated => $"{BaseNamespace}";
-    public string OneClassPerFileNamespace => $"{BaseNamespace}.{OneClassPerFileNamespaceSuffix}";
-    public string OneClassPerFileNamespaceSuffix => one_class_per_file_namespace;
-    public string OneNamespacePerFileNamespace =>
-        $"{BaseNamespace}.{OneNamespacePerFileNamespaceSuffix}";
-    public string OneNamespacePerFileNamespaceSuffix => one_namespace_per_file_namespace;
-    public string ProjectFilePath { get; }
-    public virtual string RootDirectory => Path.Combine(root_directory, BaseNamespace);
-    public string TestFilePath { get; }
-
-    private List<TreeNode<SemanticNode>> BuildClassHierarchy(List<ClassNode> classes)
-    {
-        var byName = classes.ToDictionary(c => c.Name, c => c.tree);
-        var derivedMap = BuildDerivedMap(classes, byName);
-
-        var roots = classes
-            .Where(c => c.BaseType == null || !byName.ContainsKey(c.BaseType))
-            .ToList();
-
-        return roots
-            .OrderBy(c => c.Name)
-            .Select(r => r.tree.BuildRegionTree(derivedMap, byName))
-            .ToList();
-    }
-
-    private Dictionary<string, List<TreeNode<SemanticNode>>> BuildDerivedMap(
-        List<ClassNode> classes,
-        Dictionary<string, TreeNode<SemanticNode>> byName
-    )
-    {
-        var map = new Dictionary<string, List<TreeNode<SemanticNode>>>();
-        foreach (var c in classes)
-        {
-            if (c.BaseType != null && byName.ContainsKey(c.BaseType))
-            {
-                if (!map.ContainsKey(c.BaseType))
-                    map[c.BaseType] = new();
-                map[c.BaseType].Add(c.tree);
-            }
-        }
-        return map;
-    }
-
-    string root_directory;
+    public AttributeNode(SyntaxElementNode b)
+        : base(b) { }
 }
 public class BaseNode<T>
     where T : BaseNode<T>
 {
     public TreeNode<T> tree;
 }
-
 public class BlockNode : SemanticNode
 {
     public override void AttachChild(SemanticNode child)
@@ -253,6 +197,14 @@ public class BlockNode : SemanticNode
         : base(b) { }
 
     public List<SemanticNode> Statements { get; } = new();
+}
+public class ClassDocAttribute:Attribute
+{
+    public ClassDocAttribute(string className)
+    {
+        this.ClassName = className;
+    }
+    public string ClassName;
 }
 
 public class ClassNode : TypeDeclarationNode
@@ -536,6 +488,204 @@ public class DestructorNode : ParameterizedMemberWithBodyNode
     public DestructorNode(SyntaxElementNode b)
         : base(b) { }
 }
+public class DocAttribute:Attribute
+{
+    public DocAttribute(string documentation)
+    {
+        this.documentation = documentation;
+    }
+    public string documentation;
+}
+
+public partial class EntryPoint
+{
+
+    public static EntryPoint Create(string baseNamespace) => new(baseNamespace);
+
+    public void ExtractFromNamespaces()
+    {
+        var root = LoadTreeMain();
+        root.PullChildrenOutOfNamespaces();
+        root.TestCompile(ProjectFilePath);
+        root.ToFile(ConsolidatedFilePath);
+    }
+    public void ExtractInterfaces()
+    {
+        var tree = LoadTreeMain();
+        var interfaces = tree.ExtractInterfaces();
+        interfaces.ToFormattedFile(GetCodePath("interfaces.cs"));
+    }
+    public void Format()
+    {
+        var code = File.ReadAllText(ConsolidatedFilePath);
+        code = CSharpierFormatter.Format(code);
+        File.WriteAllText(ConsolidatedFilePath, code);
+    }
+    public string GetCodePath(string fileName)
+    {
+        return Path.Combine(RootDirectory, fileName);
+    }
+
+    public string GetFilePath(string name, string subdir)
+    {
+        if (!String.IsNullOrEmpty(subdir))
+            subdir = $@"{subdir}\";
+        var ret = Path.Combine(RootDirectory, $"{subdir}{BaseNamespace}_{name}.cs");
+        return ret;
+    }
+  
+    public string GetTestFilePath(int i)
+    {
+        return Path.Combine(RootDirectory, $"{BaseNamespace}_test_{i}.cs");
+    }
+
+    public void GroupByClassHierarchy()
+    {
+        var tree = LoadTreeMain();
+        var classes = tree.FindClasses();
+        var grouped = BuildClassHierarchy(classes);
+        tree.Children.Clear();
+        grouped.ForEach(tree.AddChild);
+        tree.ToFormattedFile(TestFilePath);
+    }
+
+    public void GroupByModifierKindName()
+    {
+        var originalTree = LoadTreeMain();
+        var peek = originalTree.GroupByModifierKindName();
+        var treeWithConsecutiveGroups = peek.Tree;
+        treeWithConsecutiveGroups.TestCompile(ProjectFilePath, ConsolidatedFilePath);
+    }
+
+    public void GroupStaticExtensionMethods()
+    {
+        var root = LoadTreeMain();
+        root.MoveNonExtensionStaticMethodsInStaticClassesIntoSingleClass();
+        root.GroupStaticExtensionMethods();
+        root = root.ReloadFormatted();
+        // root.ToFormattedFile(this.ConsolidatedFilePath);
+        //root = LoadTree();
+        root.GroupByModifierKindName();
+        root.SaveFile(this.ConsolidatedFilePath);
+    }
+
+    public TreeNode<SemanticNode> LoadTree(string name, string subdir = null)
+    {
+        var loadFile = GetFilePath(name, subdir);
+        return LoadTreeFromPath(loadFile);
+    }
+    public TreeNode<SemanticNode> LoadTreeFromCodePath(string fileName)
+    {
+        string fullPath = GetCodePath(fileName);
+        var tree = SemanticTree.DeserializeFile(fullPath);
+        return tree;
+    }
+    public TreeNode<SemanticNode> LoadTreeFromPath(string fullPath)
+    {
+        var tree = SemanticTree.DeserializeFile(fullPath);
+        return tree;
+    }
+    public TreeNode<SemanticNode> LoadTreeMain()
+    {
+        return LoadTreeFromPath(ConsolidatedFilePath);
+    }
+
+    public void OrderCollectionValues()
+    {
+        var originalTree = LoadTreeMain();
+        var treeWithConsecutiveGroups = originalTree.OrderCollectionValues();
+        treeWithConsecutiveGroups.TestCompile(ProjectFilePath, ConsolidatedFilePath);
+    }
+
+    public void RefactorLargeClassIntoPartialsWithInterfaces(string className)
+    {
+        var tree = LoadTreeMain();
+        tree.DivideIntoPartialClassesByInterfaces(className);
+        tree.GroupByModifierKindName();
+        tree.ToFormattedFile(ConsolidatedFilePath);
+    }
+
+    public void TestSemanticSerializer()
+    {
+        var serializer = new SemanticTree();
+        var fileGen = new FileGen<SemanticNode>(serializer);
+        fileGen.TestRoundTripFile(ConsolidatedFilePath);
+    }
+
+    public EntryPoint(string baseNamespace, string root_directory = null)
+    {
+        if (root_directory == null)
+            root_directory = AppDomain.CurrentDomain.GetSolutionBaseFolder();
+        this.root_directory = root_directory;
+
+        if (string.IsNullOrWhiteSpace(baseNamespace))
+            throw new ArgumentException("Base namespace cannot be empty.", nameof(baseNamespace));
+
+        BaseNamespace = baseNamespace.Trim();
+
+        ProjectFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}.csproj");
+        ConsolidatedFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}.cs");
+        TestFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_test.cs");
+        ClassFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Class_Prefix}.cs");
+        MethodFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Method_Prefix}.cs");
+    }
+
+    public static string Class_Prefix = "Class";
+    public static string Consolidated_Prefix = "";
+    public static string Method_Prefix = "Method";
+    public static string one_class_per_file_namespace = "CF";
+    public static string one_namespace_per_file_namespace = "NF";
+
+    public string BaseNamespace { get; }
+    public string ClassFilePath { get; }
+    public string ConsolidatedFilePath { get; }
+    public string MethodFilePath { get; }
+
+    public string NamespaceConsolidated => $"{BaseNamespace}";
+    public string OneClassPerFileNamespace => $"{BaseNamespace}.{OneClassPerFileNamespaceSuffix}";
+    public string OneClassPerFileNamespaceSuffix => one_class_per_file_namespace;
+    public string OneNamespacePerFileNamespace =>
+        $"{BaseNamespace}.{OneNamespacePerFileNamespaceSuffix}";
+    public string OneNamespacePerFileNamespaceSuffix => one_namespace_per_file_namespace;
+    public string ProjectFilePath { get; }
+    public virtual string RootDirectory => Path.Combine(root_directory, BaseNamespace);
+    public string TestFilePath { get; }
+
+    private List<TreeNode<SemanticNode>> BuildClassHierarchy(List<ClassNode> classes)
+    {
+        var byName = classes.ToDictionary(c => c.Name, c => c.tree);
+        var derivedMap = BuildDerivedMap(classes, byName);
+
+        var roots = classes
+            .Where(c => c.BaseType == null || !byName.ContainsKey(c.BaseType))
+            .ToList();
+
+        return roots
+            .OrderBy(c => c.Name)
+            .Select(r => r.tree.BuildRegionTree(derivedMap, byName))
+            .ToList();
+    }
+
+    private Dictionary<string, List<TreeNode<SemanticNode>>> BuildDerivedMap(
+        List<ClassNode> classes,
+        Dictionary<string, TreeNode<SemanticNode>> byName
+    )
+    {
+        var map = new Dictionary<string, List<TreeNode<SemanticNode>>>();
+        foreach (var c in classes)
+        {
+            if (c.BaseType != null && byName.ContainsKey(c.BaseType))
+            {
+                if (!map.ContainsKey(c.BaseType))
+                    map[c.BaseType] = new();
+                map[c.BaseType].Add(c.tree);
+            }
+        }
+        return map;
+    }
+
+    string root_directory;
+}
 
 public class EnumMemberNode : NamedNode
 {
@@ -688,6 +838,22 @@ public static class ExtensionsOfAppDomain
             Path.AltDirectorySeparatorChar
         );
     }
+}
+public static class ExtensionsOfIEnumerableOfIEnumerableOfT
+{
+    public static IEnumerable<(T Item, int Appearances, List<int> Indices)>
+   CompareCollections<T>(this IEnumerable<IEnumerable<T>> collections) =>
+   (collections ?? Enumerable.Empty<IEnumerable<T>>())
+       .SelectMany((col, idx) =>
+           (col ?? Enumerable.Empty<T>()).Distinct()
+               .Select(item => (Item: item, Index: idx)))
+       .GroupBy(x => x.Item)
+       .OrderBy(g => g.Key?.ToString() ?? string.Empty)
+       .Select(g => (
+           Item: g.Key,
+           Appearances: g.Count(),
+           Indices: g.Select(x => x.Index).OrderBy(i => i).ToList()
+       ));
 }
 
 public static class ExtensionsOfIEnumerableOfT
@@ -1307,7 +1473,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         DeleteType deleteType = DeleteType.SingleNode
     )
     {
-        return tree.DeleteKindsSeek(new HashSet<SyntaxKind>() { kind }, deleteType);
+        return tree.DeleteKindsSeek(new HashSet<SyntaxKind>() { kind }, deleteType).ToList();
     }
     public static List<TreeNode<SemanticNode>> DeleteKinds(
        this TreeNode<SemanticNode> tree,
@@ -1389,7 +1555,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
 
     public static void EmptyMemberDeclarationsContents(
         this TreeNode<SemanticNode> tree,
-        _EntryPoint path
+        EntryPoint path
     )
     {
         var list = tree.FindWhere(t => t.Value.Kind == SyntaxKind.Block).ToList();
@@ -1416,7 +1582,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
 
     public static void EmptyTypeDeclarationsContents(
         this TreeNode<SemanticNode> tree,
-        _EntryPoint path
+        EntryPoint path
     )
     {
         var list = tree.FindWhere(t => SyntaxKindGroups.TypeDeclarations.Contains(t.Value.Kind))
@@ -1492,6 +1658,10 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
             .FindWhere(t => t.Value.Kind == SyntaxKind.MethodDeclaration)
             .Where(m => interfaceMethodNames.Contains(((MethodNode)m.Value).Name))
             .ToList();
+    public static List<InterfaceNode> FindInterfaces(this TreeNode<SemanticNode> tree)
+    {
+        return tree.FindKindVal(SyntaxKind.InterfaceDeclaration).Cast<InterfaceNode>().ToList();
+    }
 
     public static List<TreeNode<SemanticNode>> FindKind(
         this TreeNode<SemanticNode> tree,
@@ -1675,7 +1845,10 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
             .Select(t => (MethodNode)t.Value)
             .ToList();
     }
-
+    public static List<NamedNode> GetNamedNodeList(this TreeNode<SemanticNode> tree)
+    {
+        return tree.GetNamedNodes().Select(t=>(NamedNode)t.Value).ToList();
+    }
     public static IEnumerable<TreeNode<SemanticNode>> GetNamedNodes(
         this TreeNode<SemanticNode> root
     ) => root.FindWhere(t => t.Value.HasName);
@@ -1697,11 +1870,10 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
             .ToList();
         return ret;
     }
-
-
-
-  
-
+    public static List<UsingDirectiveNode>GetSystemUsings(this TreeNode<SemanticNode> tree)
+    {
+        return tree.GetUsings().Where(t => t.Name.StartsWith("Microsoft") || t.Name.StartsWith("System")).ToList();
+    }
     public static List<UsingDirectiveNode> GetUsings(this TreeNode<SemanticNode> tree)
     {
         return tree.FindWhere(t => t.Value.Kind == SyntaxKind.UsingDirective)
@@ -1832,11 +2004,11 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
 
     public static TreeNode<SemanticNode> MergeFrom(
         this TreeNode<SemanticNode> destination,
-        TreeNode<SemanticNode> source
+        TreeNode<SemanticNode> source, bool replace = true
     )
     {
         destination.AddMissingContainersByDepthFrom(source);
-        var newLowLevel = destination.ReplaceExistingLowestLevelTypesFrom(source);
+        var newLowLevel = destination.ReplaceExistingLowestLevelTypesFrom(source,replace);
         destination.AddNewLowestLevelTypesFrom(newLowLevel);
         return destination;
     }
@@ -1929,7 +2101,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
             )
         )
         {
-            x.Children = x.Children.Interleave(t => t.Value.Value);
+            x.Children = x.Children.Interleave(t => t.Value.TextVal);
         }
         return originalTree;
     }
@@ -1944,12 +2116,19 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
             root.ExtractFromNamespaces(usings, ns);
         }
     }
-
+    public static TreeNode<SemanticNode> Reload(this TreeNode<SemanticNode> node)
+    {
+        var code = node.ToCode();
+        var ret = SemanticTree.DeserializeCode(code);
+        return ret;
+    }
     public static TreeNode<SemanticNode> ReloadFormatted(this TreeNode<SemanticNode> node)
     {
         var code = node.ToCode();
+        code = code.NormalizeLineEndings();
         code = CSharpierFormatter.Format(code);
         var ret = SemanticTree.DeserializeCode(code);
+        ret.DeleteExcessNewlines();
         return ret;
     }
 
@@ -1961,7 +2140,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
 
         emptyClasses.ForEach(t => t.tree.RemoveSelf());
     }
-    
+
     public static void RenameNamespaces(
         this TreeNode<SemanticNode> tree,
         Func<string, string> replace
@@ -1985,7 +2164,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
 
     public static List<TreeNode<SemanticNode>> ReplaceExistingLowestLevelTypesFrom(
         this TreeNode<SemanticNode> destination,
-        TreeNode<SemanticNode> source
+        TreeNode<SemanticNode> source,bool replace=true
     )
     {
         var destByName = destination.GetLowestLevelTypes().ToDictionaryByFullName();
@@ -1994,7 +2173,10 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         foreach (var sourceNode in sourceTypes)
         {
             if (destByName.TryGetValue(sourceNode.Value.FullName, out var destNode))
-                destNode.ReplaceSelf(sourceNode);
+            {
+                if(replace)
+                    destNode.ReplaceSelf(sourceNode);
+            }
             else
                 newLowLevelTypes.Add(sourceNode);
         }
@@ -2078,8 +2260,10 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
     }
     public static void ToFormattedFile(this TreeNode<SemanticNode> node, string filePath)
     {
+        node = node.DeleteExcessNewlines();
         var code = node.ToCode();
         code = CSharpierFormatter.Format(code);
+        code = code.NormalizeLineEndings();
         File.WriteAllText(filePath, code);
     }
 }
@@ -2148,6 +2332,221 @@ public static class ExtensionsOfTreeNodeOfTokenNode
         if (tokenRoot == null)
             throw new ArgumentNullException(nameof(tokenRoot));
         return tokenRoot.ToSyntaxElementTree();
+    }
+}
+public static class ExtractInterfaceExtensions
+{
+    // ===================================================================
+    // PROPERTIES – now uses same robust modifier removal as methods
+    // ===================================================================
+    public static string BuildSinglePropertySignature(this PropertyNode propNode)
+    {
+        // Clone so we NEVER mutate the original class tree
+        var tree = propNode.tree.DeepClone();
+
+        // Remove exactly the same illegal modifiers that methods remove
+        var badMods = tree.DeleteKinds(SyntaxKindGroups.ModifiersToRemoveInInterfaceSignature);
+
+        string fullCode = tree.ToCode().Trim();
+
+        // Extract header (everything before { / = / ;)
+        int bodyStart = fullCode.IndexOfAny(new[] { '{', '=', ';' });
+        string header = bodyStart > 0
+            ? fullCode.Substring(0, bodyStart).Trim()
+            : fullCode;
+
+        bool hasSetter = fullCode.Contains("set") || fullCode.Contains("SetAccessor") || fullCode.Contains("init");
+        string accessors = hasSetter ? "{ get; set; }" : "{ get; }";
+
+        return $"{header} {accessors}";
+    }
+
+    public static void EnsureMethodSemicolon(this MethodNode method)
+    {
+        var tree = method.tree;
+        if (tree.Flatten().Any(n => n.Value.Kind == SyntaxKind.SemicolonToken))
+            return;
+
+        var last = tree.Flatten().LastOrDefault();
+        if (last == null) return;
+
+        var semi = new TreeNode<SemanticNode>(
+            new UnknownNode(new SyntaxElementNode(SyntaxKind.SemicolonToken, ";")));
+
+        last.InsertAfter(semi);
+    }
+    // ===================================================================
+    // MAIN ENTRY POINT – tiny orchestrator (Uncle Bob style)
+    // ===================================================================
+    public static TreeNode<SemanticNode> ExtractInterface(this ClassNode classNode)
+    {
+        if (classNode == null)
+            throw new ArgumentNullException(nameof(classNode));
+
+        string interfaceName = classNode.GetInterfaceName();
+        string generics = classNode.GetGenericParameters();
+        string whereClause = classNode.GetWhereClause();
+
+        var propertySigs = classNode.BuildAllPropertySignatures();
+        var methodSigs = classNode.BuildAllMethodSignatures();
+
+        string source = BuildInterfaceSource(interfaceName, generics, whereClause, propertySigs, methodSigs);
+
+        return SemanticTree.DeserializeCode(source);
+    }
+    public static TreeNode<SemanticNode> ExtractInterfaces(this TreeNode<SemanticNode> root)
+    {
+        var cu = CompilationUnitNode.Factory();
+        cu.AddUsings(root.GetSystemUsings());
+        foreach(var cl in root.FindClasses())
+        {
+           cu.Children.Add(cl.ExtractInterfaceWithAttributes());
+        }
+        return cu;
+    }
+
+    public static TreeNode<SemanticNode> ExtractInterfaceWithAttributes(this ClassNode classNode)
+    {
+        if (!classNode.tree.FindKinds(SyntaxKindGroups.ClassMemberKinds).Any())
+            return null;
+        string className = classNode.Name;
+        Console.WriteLine(className);
+        string iFaceName = $"I{className}";
+        string iFaceFile = $"{iFaceName}.cs";
+        var ift = classNode.ExtractInterface();
+       
+        var namedNode = (NamedNode)ift.Children.First().Value;
+        namedNode.AddClassAttribute(className);
+        //namedNode.AddDocAttribute();
+
+        foreach (NamedNode nn in namedNode.tree.FindKinds(SyntaxKindGroups.ClassMemberKinds).Select(t=>t.Value))
+        {
+            nn.AddDocAttribute();
+        }
+    
+        return ift;
+    }
+
+    // ===================================================================
+    // HELPER FOR METHOD SIGNATURES (precise MethodNode → string)
+    // ===================================================================
+    public static string GetInterfaceSignature(this MethodNode methodNode)
+    {
+        methodNode.ConvertFromStaticExtension();
+        methodNode.RemoveMethodBody();
+        methodNode.RemoveInterfaceIllegalModifiers();
+        methodNode.EnsureMethodSemicolon();
+        return methodNode.tree.ToCode();
+    }
+
+    public static void RemoveInterfaceIllegalModifiers(this MethodNode method)
+    {
+        var tree = method.tree;
+        var badMods = tree.DeleteKinds(SyntaxKindGroups.ModifiersToRemoveInInterfaceSignature);
+    }
+    public static void RemoveMethodBody(this MethodNode method)
+    {
+        var bodies = method.tree.FindWhere(t => t.Value.Kind == SyntaxKind.Block ||
+                                          t.Value.Kind == SyntaxKind.ArrowExpressionClause)
+                          .ToList();
+        foreach (var body in bodies)
+            body.Delete(DeleteType.NodeAndSubTree);
+    }
+
+    // ===================================================================
+    // METHODS
+    // ===================================================================
+    private static List<string> BuildAllMethodSignatures(this ClassNode classNode)
+    {
+        return classNode.tree
+            .FindWhere(t => t.Value.Kind == SyntaxKind.MethodDeclaration)
+            .Select(t => (MethodNode)t.Value)
+            .Where(m => m.Modifier != AccessModifier.Private)
+            .Select(m => m.GetInterfaceSignature())
+            .ToList();
+    }
+
+    // ===================================================================
+    // PROPERTIES
+    // ===================================================================
+    private static List<string> BuildAllPropertySignatures(this ClassNode classNode)
+    {
+        return classNode.tree
+            .FindWhere(t => t.Value.Kind == SyntaxKind.PropertyDeclaration)
+            .Select(t => (PropertyNode)t.Value)
+            .Where(p => p.Modifier != AccessModifier.Private)
+            .Select(p => p.BuildSinglePropertySignature())
+            .ToList();
+    }
+
+    // ===================================================================
+    // SOURCE ASSEMBLY
+    // ===================================================================
+    private static string BuildInterfaceSource(
+        string interfaceName,
+        string generics,
+        string whereClause,
+        List<string> propertySigs,
+        List<string> methodSigs)
+    {
+        var allMembers = propertySigs.Concat(methodSigs);
+        return $@"interface {interfaceName}{generics}{whereClause}
+{{
+    {string.Join("\n    ", allMembers)}
+}}";
+    }
+
+    // ===================================================================
+    // GENERICS & CONSTRAINTS
+    // ===================================================================
+    private static string GetGenericParameters(this ClassNode classNode)
+    {
+        var typeParamNode = classNode.tree
+            .FindWhere(t => t.Value.Kind == SyntaxKind.TypeParameterList)
+            .FirstOrDefault();
+
+        return typeParamNode?.ToCode()?.Trim() ?? "";
+    }
+
+    // ===================================================================
+    // NAME HELPERS
+    // ===================================================================
+    private static string GetInterfaceName(this ClassNode classNode)
+    {
+        if (string.IsNullOrEmpty(classNode?.Name))
+            throw new ArgumentException("Class must have a name");
+
+        return "I" + classNode.Name;
+    }
+
+    private static string GetWhereClause(this ClassNode classNode)
+    {
+        if (classNode == null)
+            return string.Empty;
+
+        // Only class-level constraints – stop before we enter the body/methods
+        var constraintNodes = classNode.tree
+            .FindWhereStop(
+                t => t.Value.Kind == SyntaxKind.TypeParameterConstraintClause,
+                t => t.Value.Kind == SyntaxKind.OpenBraceToken
+            )
+            .ToList();
+
+        if (!constraintNodes.Any())
+            return string.Empty;
+
+        return " " + string.Join(" ", constraintNodes.Select(c => c.ToCode().Trim()));
+    }
+
+    private static string StripModifiers(string header)
+    {
+        string[] mods = { "public ", "private ", "protected ", "internal ", "static ", "virtual ", "abstract ", "override ", "sealed ", "readonly " };
+        foreach (var m in mods)
+        {
+            if (header.StartsWith(m))
+                return header.Substring(m.Length).TrimStart();
+        }
+        return header;
     }
 }
 
@@ -2258,30 +2657,12 @@ public class InterfaceNode : TypeDeclarationNode
 }
 public partial class KnownProjectPaths
 {
-    public static _EntryPoint Evolver5 => new("Evolver5");
+    public static EntryPoint Evolver5 => new("Evolver5");
  
 }
 
 public class MethodNode : ParameterizedMemberWithBodyNode
 {
-    public override string FullName
-    {
-        get
-        {
-            return  base.FullName + String.Join('_', GetParameterTypeNames());
-        }
-    }
-    IEnumerable<ParameterNode> Parameters => tree.FindWhere(t => t.Value.Kind == SyntaxKind.Parameter).Select(t => (ParameterNode)t.Value);
-    public List<string> GetParameterTypeNames()
-    {
-        if (ParameterList == null || ParameterList.Parameters.Count == 0)
-            return new List<string>();
-
-        return ParameterList.Parameters
-            .Select(p => p.TypeText?.Trim() ?? string.Empty)
-            .Where(t => !string.IsNullOrEmpty(t))
-            .ToList();
-    }
     public void ConvertFromStaticExtension()
     {
         if (!IsStatic || !IsExtension)
@@ -2300,6 +2681,16 @@ public class MethodNode : ParameterizedMemberWithBodyNode
         EnsureStatic();
         EnsureFirstParameterIsThis();
         tree.InitializeAllNodes();
+    }
+    public List<string> GetParameterTypeNames()
+    {
+        if (ParameterList == null || ParameterList.Parameters.Count == 0)
+            return new List<string>();
+
+        return ParameterList.Parameters
+            .Select(p => p.TypeText?.Trim() ?? string.Empty)
+            .Where(t => !string.IsNullOrEmpty(t))
+            .ToList();
     }
 
     public TreeNode<SemanticNode>? GetReturnTypeNode()
@@ -2353,6 +2744,13 @@ public class MethodNode : ParameterizedMemberWithBodyNode
 
     public MethodNode(SyntaxElementNode b)
         : base(b) { }
+    public override string FullName
+    {
+        get
+        {
+            return  base.FullName + String.Join('_', GetParameterTypeNames());
+        }
+    }
 
     public bool IsExtension =>
         ParameterList.Parameters.Count > 0 && ParameterList.Parameters.First().IsThis;
@@ -2436,6 +2834,7 @@ public class MethodNode : ParameterizedMemberWithBodyNode
 
         thisKeywordNode?.Delete(DeleteType.SingleNode);
     }
+    IEnumerable<ParameterNode> Parameters => tree.FindWhere(t => t.Value.Kind == SyntaxKind.Parameter).Select(t => (ParameterNode)t.Value);
 }
 
 public abstract class NamedMemberNode : NamedNode
@@ -2511,7 +2910,7 @@ public abstract class NamedNode : SemanticNode
 
     public virtual void SetNameNode()
     {
-        NameNode = tree.FindWhere(n => n.Value.Kind == SyntaxKind.IdentifierToken).FirstOrDefault();
+        NameNode = tree.FindSkip(n => n.Value.Kind == SyntaxKind.IdentifierToken,t=>t.Value.Kind==SyntaxKind.Attribute).FirstOrDefault();
     }
 
     public override void SetTreeNode(TreeNode<SemanticNode> t)
@@ -2886,7 +3285,7 @@ public abstract class SemanticNode : BaseNode<SemanticNode>
             return names;
         }
     }
-    public virtual string Value => null;
+    public virtual string TextVal => null;
 
     protected SemanticNode(SyntaxElementNode backing)
     {
@@ -3056,7 +3455,7 @@ public class SimpleMemberAccessNode : SemanticNode
         : base(b) { }
 
     public TreeNode<SemanticNode> ValueNode;
-    public override string Value
+    public override string TextVal
     {
         get
         {
@@ -3090,6 +3489,8 @@ public class SyntaxElementNode : BaseNode<SyntaxElementNode>
     {
         return Kind switch
         {
+            SyntaxKind.AttributeList => new AttributeListNode(this),
+            SyntaxKind.Attribute => new AttributeNode(this),
             SyntaxKind.ArrowExpressionClause => new ExpressionBodyNode(this),
             SyntaxKind.Block => new BlockNode(this),
             SyntaxKind.ClassDeclaration => new ClassNode(this),
@@ -3448,7 +3849,6 @@ public class SyntaxKindGroups
         SyntaxKind.ImplicitKeyword,
         SyntaxKind.ExplicitKeyword,
     };
-
     public static readonly HashSet<SyntaxKind> ModifierKeywords = new HashSet<SyntaxKind>
     {
         SyntaxKind.AbstractKeyword,
@@ -3481,6 +3881,22 @@ public class SyntaxKindGroups
         SyntaxKind.ProtectedKeyword,
         SyntaxKind.PublicKeyword,
     };
+    public static readonly HashSet<SyntaxKind> ModifiersToRemoveInInterfaceSignature = new()
+{
+        SyntaxKind.OverrideKeyword,
+    SyntaxKind.PublicKeyword,
+    SyntaxKind.PrivateKeyword,
+    SyntaxKind.ProtectedKeyword,
+    SyntaxKind.InternalKeyword,
+    SyntaxKind.StaticKeyword,
+    SyntaxKind.VirtualKeyword,
+    SyntaxKind.AbstractKeyword,
+    SyntaxKind.OverrideKeyword,
+    SyntaxKind.SealedKeyword,
+    SyntaxKind.ExternKeyword,
+    SyntaxKind.NewKeyword,
+    SyntaxKind.PartialKeyword
+};
     public static readonly HashSet<SyntaxKind> NamespaceMemberKinds = new()
     {
         SyntaxKind.ClassDeclaration,
@@ -3783,9 +4199,7 @@ public partial class TokenNode : BaseNode<TokenNode>
     private static bool IsTrivialWhitespace(SyntaxKind k) =>
         k is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia;
 }
-
-public partial class TreeNode<T>
-    where T : BaseNode<T>
+public partial class TreeNode<T>  where T : BaseNode<T>
 {
     public TreeNode<T> AddChild(T child)
     {
@@ -4097,6 +4511,8 @@ public partial class TreeNode<T>
 
     private List<TreeNode<T>> _children = new();
 }
+
+
 
 public class TriviaNode : SemanticNode
 {
