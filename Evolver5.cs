@@ -1,9 +1,7 @@
-using static IdentifierTokenNode;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxTokenParser;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.MSBuild;
@@ -37,12 +35,6 @@ public partial class __Program
         SelfTest();
     }
 
-    private static void CompareInterfaces()
-    {
-        var files = new List<string>() { "interfaces.cs", "interfaces_grok.cs" };
-        var path = KnownProjectPaths.Evolver5;
-        files.Select(t => path.LoadTreeFromCodePath(t)).ToList().CompareObjectCount();
-    }
 
     private static void MergeTest()
     {
@@ -51,15 +43,15 @@ public partial class __Program
         var dest = path.LoadTree(@"MergeDest", "test");
         dest.MergeSelf();
         dest.MergeFrom(source);
-        dest.GroupByModifierKindName();
-        dest.ToFormattedFile(path.GetFilePath("MergeResult", "test"));
+        dest.GroupByKindModifierName();
+        dest.ToFormattedFile(path.ToNameFile("MergeResult", "test"));
     }
 
     private static void SelfTest()
     {
         var path = KnownProjectPaths.Evolver5;
         path.TestSemanticSerializer();
-        path.GroupByModifierKindName();
+        path.GroupByKindModifierName();
     }
 }
 
@@ -67,12 +59,12 @@ public static class AddAttributeExtensions
 {
     public static void AddClassAttribute(this NamedNode named, string className)
     {
-        named.AddAttribute($"[ClassDocumentation(\"{className}\")]");
+        named.AddAttribute($"[ClassDoc(\"{className}\")]");
     }
 
     public static void AddDocAttribute(this NamedNode named, string doc = null)
     {
-        named.AddAttribute($"[Documentation(\"{doc}\")]");
+        named.AddAttribute($"[Doc(\"{doc}\")]");
     }
 
     public static void AddUsings(this TreeNode<SemanticNode> root, List<UsingDirectiveNode> usings)
@@ -534,7 +526,11 @@ public class DocAttribute : Attribute
     {
         this.documentation = documentation;
     }
-
+    public DocAttribute(string documentation,string codeCheckoutReason):this(documentation)
+    {
+        this.codeCheckoutReason = codeCheckoutReason;
+    }
+    public string codeCheckoutReason;
     public string documentation;
 }
 
@@ -562,22 +558,15 @@ public partial class EntryPoint
         code = CSharpierFormatter.Format(code);
         File.WriteAllText(ConsolidatedFilePath, code);
     }
-    public string GetFilePath(string name, string subdir)
-    {
-        if (!String.IsNullOrEmpty(subdir))
-            subdir = $@"{subdir}\";
-        var ret = Path.Combine(RootDirectory, $"{subdir}{BaseNamespace}_{name}.cs");
-        return ret;
-    }
     public string GetSubDir(string subDir)
     {
         return Path.Combine(RootDirectory, subDir);
     }
 
-    public void GroupByModifierKindName()
+    public void GroupByKindModifierName()
     {
         var originalTree = LoadTreeMain();
-        var peek = originalTree.GroupByModifierKindName();
+        var peek = originalTree.GroupByKindModifierName();
         var treeWithConsecutiveGroups = peek.Tree;
         treeWithConsecutiveGroups.TestCompile(ProjectFilePath, ConsolidatedFilePath);
     }
@@ -590,13 +579,13 @@ public partial class EntryPoint
         root = root.ReloadFormatted();
         
         
-        root.GroupByModifierKindName();
+        root.GroupByKindModifierName();
         root.SaveFile(this.ConsolidatedFilePath);
     }
 
     public TreeNode<SemanticNode> LoadTree(string name, string subdir = null)
     {
-        var loadFile = GetFilePath(name, subdir);
+        var loadFile = ToNameFile(name, subdir);
         return LoadTreeFromPath(loadFile);
     }
 
@@ -657,6 +646,17 @@ public partial class EntryPoint
         var serializer = new SemanticTree();
         var fileGen = new FileGen<SemanticNode>(serializer);
         fileGen.TestRoundTripFile(ConsolidatedFilePath);
+    }
+    public string ToNameFile(string name, string subdir=null)
+    {
+        if (!String.IsNullOrEmpty(subdir))
+            subdir = $@"{subdir}\";
+        var ret = Path.Combine(RootDirectory, $"{subdir}{BaseNamespace}_{name}.cs");
+        return ret;
+    }
+    public string WithRootDir(string name)
+    {
+        return Path.Combine(RootDirectory, name);
     }
 
     public EntryPoint(string baseNamespace, string root_directory = null)
@@ -755,7 +755,7 @@ public partial class EntryPoint
     {
         var tree = LoadTreeMain();
         tree.DivideIntoPartialClassesByInterfaces(className);
-        tree.GroupByModifierKindName();
+        tree.GroupByKindModifierName();
         tree.ToFormattedFile(ConsolidatedFilePath);
     }
 
@@ -1111,11 +1111,11 @@ public static class ExtensionsOfListOfTreeNodeOfSemanticNode
         return roots.FindText(include, delimeters);
     }
 
-    public static List<List<TreeNode<SemanticNode>>> GroupedByModifierKind(
+    public static List<List<TreeNode<SemanticNode>>> GroupByKindModifier(
         this List<TreeNode<SemanticNode>> children
     ) =>
         children
-            .GroupBy(t => new { t.Value.Modifier, Kind = t.Value.Kind.ToHandled() })
+            .GroupBy(t => new { Kind = t.Value.Kind.ToHandled(), t.Value.Modifier })
             .Select(g => g.ToList())
             .ToList();
 
@@ -1131,12 +1131,12 @@ public static class ExtensionsOfListOfTreeNodeOfSemanticNode
         }
     }
 
-    public static List<TreeNode<SemanticNode>> SortedByModifierKindName(
+    public static List<TreeNode<SemanticNode>> SortedByKindModifierName(
         this List<TreeNode<SemanticNode>> children
     ) =>
         children
-            .OrderBy(t => t.Value.Modifier)
-            .ThenBy(t => t.Value.Kind.ToHandled())
+            .OrderBy(t => t.Value.Kind.ToHandled())
+            .ThenBy(t => t.Value.Modifier)
             .ThenBy(t => t.Value.TypeName ?? "")
             .ToList();
 
@@ -1425,7 +1425,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         DeleteType deleteType = DeleteType.SingleNode
     )
     {
-        return tree.DeleteKindsSeek(kinds).ToList();
+        return tree.DeleteKindsSeek(kinds,deleteType).ToList();
     }
 
     public static IEnumerable<TreeNode<SemanticNode>> DeleteKindsSeek(
@@ -1437,7 +1437,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         foreach (var x in tree.FindWhere(t => kinds.Contains(t.Value.Kind)).ToList())
         {
             yield return x;
-            x.Delete(DeleteType.SingleNode);
+            x.Delete(deleteType);
         }
     }
 
@@ -1573,22 +1573,25 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
             .Where(t => t.TypeName.StartsWith("Microsoft") || t.TypeName.StartsWith("System"))
             .ToList();
     }
-
     public static List<T> GetTypedList<T>(this TreeNode<SemanticNode> tree)
     {
         return tree.FindWhere(t => t.Value is T).ToTypedList<T>();  
     }
+    public static List<T> GetTypedListKinds<T>(this TreeNode<SemanticNode> tree,HashSet<SyntaxKind> kinds)
+    {
+        return tree.FindWhere(t =>kinds.Contains(t.Value.Kind) && t.Value is T).ToTypedList<T>();
+    }
     public static (
         TreeNode<SemanticNode> Tree,
         List<List<TreeNode<SemanticNode>>> Groups
-    ) GroupByModifierKindName(this TreeNode<SemanticNode> tree)
+    ) GroupByKindModifierName(this TreeNode<SemanticNode> tree)
     {
         var groups = new List<List<TreeNode<SemanticNode>>>();
 
         foreach (var x in tree.FindWhere(t => t.Value.HasDirectNamedChildren))
         {
-            var sorted = x.Children.SortedByModifierKindName();
-            groups.AddRange(sorted.GroupedByModifierKind());
+            var sorted = x.Children.SortedByKindModifierName();
+            groups.AddRange(sorted.GroupByKindModifier());
             x.Children = sorted;
         }
 
@@ -1681,7 +1684,7 @@ public static class ExtensionsOfTreeNodeOfSemanticNode
         {
             source.MergeAtDepth(i);
         }
-        var result = source.GroupByModifierKindName().Tree;
+        var result = source.GroupByKindModifierName().Tree;
         result.DeleteExcessNewlines();
         return result;
     }
@@ -2458,12 +2461,15 @@ public static class ExtractInterfaceExtensions
 {
     public static TreeNode<SemanticNode> ExtractInterfaces(this TreeNode<SemanticNode> root)
     {
+        root.DeleteKinds(SyntaxKindGroups.AttributeKinds, DeleteType.NodeAndSubTree);
         var cu = CompilationUnitNode.Factory();
-        cu.AddUsings(root.GetSystemUsings());
-        foreach (var cl in root.GetClasses())
-        {
-            cu.Children.Add(cl.ExtractInterfaceWithAttributes());
-        }
+        cu.AddUsings(root.GetTypedList<UsingDirectiveNode>());
+        foreach (var c in root.GetTypedList<ClassNode>())
+            cu.Children.Add(c.ExtractInterfaceWithAttributes());
+
+        var evol5 = KnownProjectPaths.Evolver5.LoadTreeMain();
+        var attr = evol5.FindWhere(t => t.Value.Kind == SyntaxKind.ClassDeclaration && t.Value.TypeName.Trim().EndsWith("Attribute")).ToList();
+        cu.Children.AddRange(attr);
         return cu;
     }
 
@@ -2475,7 +2481,6 @@ public static class ExtractInterfaceExtensions
         return classNode
             ._tree.FindWhere(t => t.Value.Kind == SyntaxKind.MethodDeclaration)
             .Select(t => (MethodNode)t.Value)
-            .Where(m => m.Modifier != AccessModifier.Private)
             .Select(m => m.GetInterfaceSignature())
             .ToList();
     }
@@ -2622,7 +2627,7 @@ public static class ExtractInterfaceExtensions
         if (string.IsNullOrEmpty(classNode?.TypeName))
             throw new ArgumentException("Class must have a name");
 
-        return "I" + classNode.TypeName;
+        return "IDocument_" + classNode.TypeName;
     }
 
     
@@ -3925,6 +3930,11 @@ public class SyntaxElementNode : BaseNode<SyntaxElementNode>
 
 public class SyntaxKindGroups
 {
+    public static readonly HashSet<SyntaxKind> AttributeKinds = new()
+    {
+        SyntaxKind.AttributeList,
+        SyntaxKind.Attribute
+    };
     public static readonly HashSet<SyntaxKind> AllKeywords = new HashSet<SyntaxKind>
     {
         SyntaxKind.AbstractKeyword,
@@ -4108,6 +4118,7 @@ public class SyntaxKindGroups
         SyntaxKind.RecordStructDeclaration,
         SyntaxKind.StructDeclaration,
     };
+    public static readonly HashSet<SyntaxKind> ClassOrInterface = new HashSet<SyntaxKind>() { SyntaxKind.ClassDeclaration, SyntaxKind.InterfaceDeclaration };
     public static readonly HashSet<SyntaxKind> CollectionInitializerKinds = new()
     {
         SyntaxKind.ArrayInitializerExpression,
@@ -4210,6 +4221,7 @@ public class SyntaxKindGroups
     {
         SyntaxKind.AbstractKeyword,
         SyntaxKind.AsyncKeyword,
+        SyntaxKind.RequiredKeyword,
         SyntaxKind.ExplicitKeyword,
         
         SyntaxKind.ExternKeyword,
@@ -4265,6 +4277,8 @@ public class SyntaxKindGroups
     public static readonly HashSet<SyntaxKind> ModifiersToRemoveInInterfaceSignature = new()
     {
         SyntaxKind.AbstractKeyword,
+        SyntaxKind.AsyncKeyword,
+           SyntaxKind.RequiredKeyword,
         SyntaxKind.ExternKeyword,
         SyntaxKind.InternalKeyword,
         SyntaxKind.NewKeyword,
@@ -5024,35 +5038,53 @@ public enum ProjectName
 
 public enum SyntaxKindOrdering
 {
+    // ── 1. File structure (always first) ─────────────────────────────────────
     UsingDirective,
     FileScopedNamespaceDeclaration,
-    MethodDeclaration,
-    ClassDeclaration,
     NamespaceDeclaration,
+    CompilationUnit,
+    ClassDeclaration,
+    // ── 2. CONTRACTS FIRST (this is the #1 thing we agreed on) ───────────────
     InterfaceDeclaration,
+
+    // ── 3. Foundational / helper types (AllConstants, static utilities, etc.) ──
+          // e.g. AllConstants, UniverseRanker, VolatilityEstimator, HurstCalculator, etc.
+
+    // ── 4. Simple value / data types ────────────────────────────────────────
     EnumDeclaration,
     RecordDeclaration,
     StructDeclaration,
-    DelegateDeclaration,
-    ConstructorDeclaration,
 
+    // ── 5. Core business logic classes ──────────────────────────────────────
+    // (Engine, SymbolMonitor, CorrelationService, DefenseRelaxer, etc.)
+
+    // ── 6. Other top-level declarations ─────────────────────────────────────
+    DelegateDeclaration,
+
+    // ── 7. Members (inside classes — logical internal order) ────────────────
+    ConstructorDeclaration,
     FieldDeclaration,
     EventFieldDeclaration,
-    DestructorDeclaration,
-    EventDeclaration,
     PropertyDeclaration,
+    EventDeclaration,
     IndexerDeclaration,
     OperatorDeclaration,
+    MethodDeclaration,
     EnumMemberDeclaration,
+
+    // ── 8. Code structure elements ──────────────────────────────────────────
     Block,
     ArrowExpressionClause,
-    SingleLineCommentTrivia,
-    MultiLineCommentTrivia,
+
+    // ── 9. Trivia & formatting (always last) ────────────────────────────────
     RegionDirectiveTrivia,
     EndRegionDirectiveTrivia,
+    SingleLineCommentTrivia,
+    MultiLineCommentTrivia,
     WhitespaceTrivia,
     EndOfLineTrivia,
-    CompilationUnit,
+    DestructorDeclaration,
+    // ── 10. Catch-all ───────────────────────────────────────────────────────
     None,
-    Unknown,
+    Unknown
 }
