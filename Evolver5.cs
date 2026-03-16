@@ -27,13 +27,16 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-
+using Evolver5.Attributes;
 public partial class __Program
 {
-    public static void Main()
+    public static void nMain()
     {
+        var path = KnownProjectPaths.Evolver5;
+        path.ExtractInterfaces();
         SelfTest();
     }
+   
 
 
     private static void MergeTest()
@@ -57,6 +60,20 @@ public partial class __Program
 
 public static class AddAttributeExtensions
 {
+    public static void AddDocAttributes(this NamedNode namedNode,string className)
+    {
+        namedNode.AddClassAttribute(className);
+
+        foreach (
+            NamedNode nn in namedNode
+                ._tree.FindKinds(SyntaxKindGroups.ClassMemberKinds)
+                .Select(t => t.Value)
+        )
+        {
+            nn.AddDocAttribute();
+        }
+
+    }
     public static void AddClassAttribute(this NamedNode named, string className)
     {
         named.AddAttribute($"[ClassDoc(\"{className}\")]");
@@ -227,15 +244,7 @@ public class BlockNode : SemanticNode
     public List<SemanticNode> Statements { get; } = new();
 }
 
-public class ClassDocAttribute : Attribute
-{
-    public ClassDocAttribute(string className)
-    {
-        this.ClassName = className;
-    }
 
-    public string ClassName;
-}
 
 public class ClassNode : TypeDeclarationNode
 {
@@ -520,19 +529,7 @@ public class DestructorNode : ParameterizedMemberWithBodyNode
         : base(b) { }
 }
 
-public class DocAttribute : Attribute
-{
-    public DocAttribute(string documentation)
-    {
-        this.documentation = documentation;
-    }
-    public DocAttribute(string documentation,string codeCheckoutReason):this(documentation)
-    {
-        this.codeCheckoutReason = codeCheckoutReason;
-    }
-    public string codeCheckoutReason;
-    public string documentation;
-}
+
 
 public partial class EntryPoint
 {
@@ -543,13 +540,14 @@ public partial class EntryPoint
         root.PullChildrenOutOfNamespaces();
         root.TestCompile(ProjectFilePath);
         root.ToFile(ConsolidatedFilePath);
+
     }
 
     public void ExtractInterfaces()
     {
         var tree = LoadTreeMain();
         var interfaces = tree.ExtractInterfaces();
-        interfaces.ToFormattedFile(GetCodePath("interfaces.cs"));
+        interfaces.ToFormattedFile(GetCodePath("IDocs.cs"));
     }
 
     public void Format()
@@ -672,6 +670,7 @@ public partial class EntryPoint
 
         ProjectFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}.csproj");
         ConsolidatedFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}.cs");
+        DocumentationFilePath = Path.Combine(RootDirectory, "IDocs.cs");
         TestFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_test.cs");
         ClassFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Class_Prefix}.cs");
         MethodFilePath = Path.Combine(RootDirectory, $"{BaseNamespace}_{Method_Prefix}.cs");
@@ -686,6 +685,7 @@ public partial class EntryPoint
     public string BaseNamespace { get; }
     public string ClassFilePath { get; }
     public string ConsolidatedFilePath { get; }
+    public string DocumentationFilePath { get; }
     public string MethodFilePath { get; }
 
     public string NamespaceConsolidated => $"{BaseNamespace}";
@@ -2467,7 +2467,7 @@ public static class ExtractInterfaceExtensions
         foreach (var c in root.GetTypedList<ClassNode>())
             cu.Children.Add(c.ExtractInterfaceWithAttributes());
 
-        var evol5 = KnownProjectPaths.Evolver5.LoadTreeMain();
+        var evol5 = KnownProjectPaths.Evolver5.LoadTreeFromCodePath("Attribute.cs");
         var attr = evol5.FindWhere(t => t.Value.Kind == SyntaxKind.ClassDeclaration && t.Value.TypeName.Trim().EndsWith("Attribute")).ToList();
         cu.Children.AddRange(attr);
         return cu;
@@ -2591,19 +2591,8 @@ public static class ExtractInterfaceExtensions
             return null;
         string className = classNode.TypeName;
         var ift = classNode.ExtractInterface();
-
         var namedNode = (NamedNode)ift.Children.First().Value;
-        namedNode.AddClassAttribute(className);
-  
-        foreach (
-            NamedNode nn in namedNode
-                ._tree.FindKinds(SyntaxKindGroups.ClassMemberKinds)
-                .Select(t => t.Value)
-        )
-        {
-            nn.AddDocAttribute();
-        }
-
+        namedNode.AddDocAttributes(className);
         return ift;
     }
 
