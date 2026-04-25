@@ -5,6 +5,8 @@
 
 Evolver5 is a powerful C# source code analysis, transformation, and evolution framework. It uses a custom semantic AST (Abstract Syntax Tree) to parse, manipulate, refactor, and generate C# code with high precision. Designed for large-scale codebases, it supports merging duplicates, extracting partial classes, generating documentation, dependency analysis, and more—all while ensuring compilability via integrated checks.
 
+https://grok.com/c/6031941c-427a-43a0-8461-7d4da4ca9d25?rid=2d46af56-3e87-4627-9563-08db3f6bdfea
+
 ## 🚀 Features
 
 - **Custom Semantic Tree**: Roslyn-inspired parsing into a lightweight, mutable `TreeNode<NodeSemantic>` structure.
