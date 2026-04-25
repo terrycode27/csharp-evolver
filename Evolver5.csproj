@@ -1,16 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- Core settings -->
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>nullable</NoWarn>
-     <LangVersion>preview</LangVersion>           <!-- optional: if you want latest C# features -->
-     <SuppressPreviewWarnings>true</SuppressPreviewWarnings>
-     <RootNamespace>Evolver5</RootNamespace>       <!-- optional but good practice -->
-  </PropertyGroup>
+    <LangVersion>preview</LangVersion>
+    <SuppressPreviewWarnings>true</SuppressPreviewWarnings>
+    <RootNamespace>Evolver5</RootNamespace>
 
+    <!-- === IMPORTANT: Packaging settings === -->
+    <IsPackable>true</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <Version>1.2.14</Version>                    <!-- Update this when you want a new release -->
+    <PackageId>Evolver5</PackageId>
+    <Authors>terrycode27</Authors>
+    <Description>C# Evolver</Description>
+    <PackageTags>csharp;roslyn;ai;code-generation</PackageTags>
+  </PropertyGroup>
 
   <ItemGroup>
     <None Remove="Evolver5.csproj.vspscc" />
@@ -36,7 +44,6 @@
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
 
-
   <ItemGroup>
     <None Update="_dependency\CSharpier\CSharpier.Core.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -49,11 +56,9 @@
     </None>
   </ItemGroup>
 
-
-
-  <!-- Optional: suppress noisy MSBuild warnings if they appear -->
+  <!-- Suppress noisy warnings -->
   <PropertyGroup>
-    <NoWarn>$(NoWarn);MSB3277;CS0693;NU1701;CS0219;CS0162;CS0649;CS0414;NETSDK1057</NoWarn> <!-- MSB3277 = assembly version conflict, NU1701 = package compatibility, CS0219=unused var, CS0162=unreachable, CS0649=unassigned field, CS0414=unused field -->
+    <NoWarn>$(NoWarn);MSB3277;CS0693;NU1701;CS0219;CS0162;CS0649;CS0414;NETSDK1057</NoWarn>
   </PropertyGroup>
 
 </Project>
