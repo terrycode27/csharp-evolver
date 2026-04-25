@@ -1,61 +1,43 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
- <PropertyGroup>
-    <!-- CHANGED: Library instead of Exe -->
-    <OutputType>Library</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>nullable</NoWarn>
-    <LangVersion>13.0</LangVersion>
-    <RootNamespace>Evolver5</RootNamespace>
-<Version>1.2.12</Version>
-    <!-- NEW: NuGet package metadata (required for a good package) -->
-    <PackageId>Evolver5</PackageId>
-    <Authors>terrycode27</Authors>
-    <Company>terrycode27</Company>
-    <Description>Deserialize C# code, slice, dice, split, merge, query, refactor. Built with Roslyn for use with AI/Agentic/LLM assisted coding.</Description>
-    <PackageTags>roslyn;csharp;refactor;merge;ai;llm;code-generation</PackageTags>
-    <RepositoryUrl>https://github.com/terrycode27/csharp-evolver</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/terrycode27/csharp-evolver</PackageProjectUrl>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression> <!-- change if you use a different license -->
-    <IsPackable>true</IsPackable>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-<PackageReadmeFile>README.md</PackageReadmeFile>
+     <LangVersion>preview</LangVersion>           <!-- optional: if you want latest C# features -->
+     <SuppressPreviewWarnings>true</SuppressPreviewWarnings>
+     <RootNamespace>Evolver5</RootNamespace>       <!-- optional but good practice -->
   </PropertyGroup>
 
- 
 
   <ItemGroup>
-    <Compile Remove="Test\Evolver5_Class.cs" />
-    <Compile Remove="Test\Evolver5_MergeDest.cs" />
-    <Compile Remove="Test\Evolver5_MergeResult.cs" />
-    <Compile Remove="Test\Evolver5_MergeSource.cs" />
-    <Compile Remove="Test\Evolver5_Method.cs" />
+    <None Remove="Evolver5.csproj.vspscc" />
   </ItemGroup>
 
-  
-
-<ItemGroup>
-  <None Remove="Evolver5.csproj.vspscc" />
-  <None Include="README.md" Pack="true" PackagePath="\" />
-</ItemGroup>
-
-<ItemGroup>
-  <PackageReference Include="LangChain.Providers.OpenRouter" Version="0.17.0" />
-  <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="5.0.0" />
-  <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
-  <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
-  <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
-  <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
-  <PackageReference Include="Microsoft.TeamFoundationServer.Client" Version="19.225.1" />
-  <PackageReference Include="Microsoft.TeamFoundationServer.ExtendedClient" Version="19.225.1" />
-  <PackageReference Include="Microsoft.VisualStudio.Services.Client" Version="19.225.1" />
-</ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="csvhelper" Version="33.1.0" />
+    <PackageReference Include="LangChain.Providers.OpenRouter" Version="0.17.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.77.1" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.0.1" />
+    <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
+    <PackageReference Include="Microsoft.TeamFoundationServer.Client" Version="19.225.1" />
+    <PackageReference Include="Microsoft.TeamFoundationServer.ExtendedClient" Version="19.225.1" />
+    <PackageReference Include="Microsoft.VisualStudio.Services.Client" Version="19.225.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="4.2.1" />
+    <PackageReference Include="MSTest.TestFramework" Version="4.2.1" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+  </ItemGroup>
 
 
   <ItemGroup>
- 
     <None Update="_dependency\CSharpier\CSharpier.Core.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -67,16 +49,11 @@
     </None>
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Test\" />
-  </ItemGroup>
-
 
 
   <!-- Optional: suppress noisy MSBuild warnings if they appear -->
   <PropertyGroup>
-    <NoWarn>$(NoWarn);MSB3277</NoWarn> <!-- MSB3277 = assembly version conflict -->
-	
+    <NoWarn>$(NoWarn);MSB3277;CS0693;NU1701;CS0219;CS0162;CS0649;CS0414;NETSDK1057</NoWarn> <!-- MSB3277 = assembly version conflict, NU1701 = package compatibility, CS0219=unused var, CS0162=unreachable, CS0649=unassigned field, CS0414=unused field -->
   </PropertyGroup>
 
 </Project>

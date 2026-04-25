@@ -1,235 +1,180 @@
+```markdown
+# Evolver5
 
-# C# Evolver
+[![Build](https://github.com/yourusername/Evolver5/actions/workflows/build.yml/badge.svg)](https://github.com/yourusername/Evolver5/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Advanced Roslyn-powered toolkit for semantic C# code transformation, intelligent refactoring, and automated code organization.**
+Evolver5 is a powerful C# source code analysis, transformation, and evolution framework. It uses a custom semantic AST (Abstract Syntax Tree) to parse, manipulate, refactor, and generate C# code with high precision. Designed for large-scale codebases, it supports merging duplicates, extracting partial classes, generating documentation, dependency analysis, and more—all while ensuring compilability via integrated checks.
 
-[![GitHub stars](https://img.shields.io/github/stars/terrycode27/csharp-evolver?style=social)](https://github.com/terrycode27/csharp-evolver)
-[![License](https://img.shields.io/github/license/terrycode27/csharp-evolver)](https://github.com/terrycode27/csharp-evolver/blob/main/LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-8.0-blue.svg)](https://dotnet.microsoft.com/)
-[![Roslyn](https://img.shields.io/badge/Roslyn-powered-6A4EFF)](https://github.com/dotnet/roslyn)
+## 🚀 Features
 
-## ✨ Features
+- **Custom Semantic Tree**: Roslyn-inspired parsing into a lightweight, mutable `TreeNode<NodeSemantic>` structure.
+- **Code Merging & Deduplication**: Detect and consolidate duplicate types/methods across files (`DocMergeSelf`).
+- **Partial Class Refactoring**: Automatically split large classes by interfaces into partials (`DivideIntoPartialClassesByInterfaces`).
+- **Documentation Automation**: Generate doc interfaces with attributes (`CreateDocInterfaces`, `MergeAttributesFromDocs`).
+- **Hierarchy & Dependency Analysis**: Class hierarchies, module dependencies, dead code detection (`GetAllDerivedClassesDictionary`, `ToModuleDictionary`).
+- **Workflows & Formatting**: Chained transformations with CSharpier integration and `dotnet format`.
+- **Compilation Validation**: Real-time `dotnet build` checks during evolutions (`TestCompile`, `CompileWithDotNetBuild`).
+- **YAML Export**: Serialize hierarchies, types, and modules (`HierarchySave`, `ToYAMLFile`).
+- **Advanced Grouping**: Group by kind/modifier/name, class hierarchies (`GroupByKindModifierName`, `BuildClassHierarchy`).
+- **Extensibility**: 100+ extension methods for tree traversal, matching, and mutation.
 
-- **Semantic Tree Model**: Rich, strongly-typed representation of C# code using a custom `TreeNode<SemanticNode>` hierarchy
-- **Intelligent Merging**: Merge partial classes, namespaces, and code from multiple sources while preserving semantics
-- **Interface Extraction**: Automatically generate interfaces from classes with proper attributes and documentation
-- **Code Organization**: Group members by kind, access modifier, and name for consistent, readable structure
-- **Extension Method Handling**: Seamlessly convert between static helper classes and proper C# extension methods
-- **File Structure Tools**: Split types into one-file-per-type or consolidate multiple files into a single semantic model
-- **Round-trip Safety**: Full serialization/deserialization with compilation verification and CSharpier formatting
-- **Large Class Refactoring**: Split oversized classes into partial implementations based on interfaces
-- **Self-hosting Tests**: Includes comprehensive self-testing on its own codebase
+## 📁 Project Structure
 
-## 📖 Table of Contents
-
-- [✨ Features](#-features)
-- [🚀 Quick Start](#-quick-start)
-- [📦 Installation](#-installation)
-- [💡 Usage](#-usage)
-- [🛠 Tech Stack](#-tech-stack)
-- [🔧 Configuration](#-configuration)
-- [🧪 Testing / Development](#-testing--development)
-- [🚀 Deployment](#-deployment)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [🙏 Acknowledgments](#-acknowledgments)
-
-## 🚀 Quick Start
-
-```bash
-git clone https://github.com/terrycode27/csharp-evolver.git
-cd csharp-evolver
-
-# Build the solution
-dotnet build
-
-# Run self-test (demonstrates all core capabilities)
-dotnet run --project Evolver5
+```
+Evolver5/
+├── Core/                 # Tree & syntax primitives
+│   ├── SyntaxElementNode.cs
+│   ├── SyntaxKindGroups.cs
+│   ├── TokenNode.cs
+│   ├── TreeNode.cs
+│   └── ... (Tree<T>, yamlString)
+├── Extensions/           # Fluent APIs (200+ methods)
+│   ├── ExtensionsOfTreeNodeOfNodeSemantic.cs  # Core tree ops
+│   ├── ExtensionsOfListOfTreeNodeOfNodeSemantic.cs
+│   └── ... (IEnumerable, List, Node, String exts)
+├── Models/               # Data models
+│   ├── EntryPoint.cs     # Project manager
+│   ├── ModuleInfo.cs     # Dependency graphs
+│   ├── NodeSemantic.cs   # AST base (partial)
+│   └── SignatureData.cs  # Type signatures
+├── Nodes/                # AST nodes (40+)
+│   ├── NodeClass.cs
+│   ├── NodeMethod.cs
+│   ├── NodeTypeDeclaration.cs
+│   └── ... (CompilationUnit, Namespace, etc.)
+├── Serializers/          # Code ↔ Tree
+│   ├── SerializerSemanticTree.cs
+│   └── ...
+├── Utils/                # Helpers
+│   ├── CompilationUtil.cs
+│   ├── CSharpierFormatter.cs
+│   └── StaticHelpers.cs
+├── Evolver5.cs           # Consolidated entry (this file)
+├── Evolver5.yaml         # File hierarchy manifest
+├── Evolver5.csproj       # Project file
+└── readme.md
 ```
 
-## 📦 Installation
+Full hierarchy: [Evolver5.yaml](Evolver5.yaml)
+
+## 🛠 Quick Start
 
 ### Prerequisites
+- .NET 8+
+- CSharpier (via `_dependency\CSharpier`)
 
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download) or later
-- Visual Studio 2022 (recommended for full Roslyn integration)
-
-### As a Library
-
+### Build & Run
 ```bash
-dotnet add package CSharpEvolver
+git clone https://github.com/yourusername/Evolver5.git
+cd Evolver5
+dotnet restore
+dotnet build
+dotnet run
 ```
 
-### From Source
+This runs the `Main` evolution: generates this README via Grok API (meta!).
 
-1. Clone the repository
-2. Restore dependencies:
-   ```bash
-   dotnet restore
-   ```
-3. Build the project:
-   ```bash
-   dotnet build -c Release
-   ```
-
-### Environment Variables
-
-No environment variables are required for core functionality. The tool automatically detects the solution root.
-
-## 💡 Usage
-
-### Basic Example
-
+### Core Workflow
 ```csharp
-using CSharpEvolver;
+using static KPP.Evolver5;  // EntryPoint "Evolver5"
 
-// Initialize entry point for a project
-var entry = EntryPoint.Create("Evolver5");
+// Load consolidated code
+var tree = Load();  // Evolver5.cs
 
-// Extract interfaces from all classes
-entry.ExtractInterfaces();
+// Transform: merge duplicates, group, clean
+tree = tree
+    .DocMergeSelf()                    // Dedupe types
+    .GroupByKindModifierName()         // Sort members
+    .DocCleanWhitespaceAll();          // Normalize WS
 
-// Group code logically by kind, modifier, and name
-entry.GroupByKindModifierName();
+// Save & format
+tree.ToFile(ConsolidatedFileFullPath);
+DotNetFormat();  // dotnet format
 
-// Convert static helper methods into proper extension methods
-entry.GroupStaticExtensionMethods();
+// Compile check
+tree.TestCompile(ProjectFilePath, ConsolidatedFileFullPath);
 ```
 
-### Common Workflows
+## 💡 Examples
 
-**Consolidate multiple class files:**
-
+### 1. Extract Interface Implementations → Partials
 ```csharp
-var entry = EntryPoint.Create("MyProject");
-entry.MergeIntoOneFile("classes", "MyProject.cs");
+var tree = Load();
+tree.DivideIntoPartialClassesByInterfaces("MyLargeClass", "IMyInterface");
+// → MyLargeClass_Implements_IMyInterface.cs (partial)
 ```
 
-**Split a monolithic file into one type per file:**
-
+### 2. Dependency Graph → YAML
 ```csharp
-var entry = EntryPoint.Create("MyProject");
-entry.SplitIntoOneTypePerFile("MyProject.cs", "classes");
+var modules = tree.ToModuleDictionary();  // { TypeName → ModuleInfo }
+modules.ToYamlFile(WithYamlDir("modules.yaml"));
 ```
 
-**Refactor a large class using interfaces:**
-
+### 3. Class Hierarchy Regions
 ```csharp
-var entry = EntryPoint.Create("MyProject");
-entry.RefactorLargeClassIntoPartialsWithInterfaces("LargeService");
+var hierarchy = BuildClassHierarchy(GetClasses());
+tree.Children.Clear();
+hierarchy.ForEach(tree.AddChild);
+tree.ToFile(TestFilePath);
 ```
 
-**Round-trip test (parse → transform → verify):**
-
+### 4. Doc Interfaces
 ```csharp
-var path = KnownProjectPaths.Evolver5;
-path.TestSemanticSerializer();
-path.GroupByKindModifierName();
+CreateDocInterfaces();       // → IDocs.cs
+DocSplitIntoFilesTree();     // Split to yaml/
+DocMergeIntoOneFile();       // Merge back
 ```
 
-### Command Reference (via EntryPoint)
-
-| Method | Purpose |
-|-------|---------|
-| `ExtractInterfaces()` | Generates `I*` interfaces from implementation classes |
-| `GroupByKindModifierName()` | Organizes members consistently within types |
-| `GroupStaticExtensionMethods()` | Converts static classes containing extensions |
-| `SplitIntoOneTypePerFile()` | Creates clean one-type-per-file structure |
-| `MergeIntoOneFile()` | Combines multiple files into semantic model |
-| `ExtractFromNamespaces()` | Flattens namespaces for analysis |
-| `MergeSelf()` / `MergeFrom()` | Smart merging of partial definitions |
-
-## 🛠 Tech Stack
-
-- **Language**: C# 12
-- **Framework**: .NET 8
-- **Compiler Platform**: Microsoft.CodeAnalysis (Roslyn)
-- **Formatting**: CSharpier (isolated assembly loading)
-- **JSON**: Newtonsoft.Json
-- **Build**: MSBuild + Microsoft.Build.Locator
-- **Architecture**: Custom immutable-style semantic tree with extensive extension methods
-
-## 🔧 Configuration
-
-The toolkit is primarily code-driven. Key paths are defined in `KnownProjectPaths`:
-
-```csharp
-public partial class KnownProjectPaths
-{
-    public static EntryPoint Evolver5 => new("Evolver5");
-}
-```
-
-For custom projects:
-
-```csharp
-var entry = new EntryPoint("MyProjectName", @"C:\path\to\solution");
-```
-
-The project expects a standard structure:
-```
-MyProject/
-├── MyProject.csproj
-├── MyProject.cs              # consolidated file
-├── classes/                  # one type per file
-└── MyProject_test.cs
-```
-
-## 🧪 Testing / Development
-
+### 5. Multi-File Consolidation
 ```bash
-# Run all self-tests
-dotnet test
-
-# Run specific semantic round-trip test
-dotnet run --project Evolver5 --self-test
-
-# Format all generated code
-entry.Format();
+# From dir
+di.MergeCodeDirectoryTo("Evolver5_Consolidated.cs");
 ```
 
-**Testing Capabilities Built-in:**
-- Round-trip verification (parse → serialize → compare)
-- Compilation testing against original project
-- Semantic equivalence checking
-- CSharpier formatting validation
+## 🔧 API Highlights
 
-## 🚀 Deployment
+- **EntryPoint**: Project orchestrator (`KPP.Evolver5`).
+  - `Workflow(func)`: Apply transformations + format.
+  - `Load()`, `ToFile()`, `DotNetFormat()`.
 
-As a library, simply reference the compiled DLL or NuGet package.
+- **TreeNode<NodeSemantic>**: Core AST.
+  - `FindWhere(predicate)`, `DeleteKinds(kinds)`.
+  - `ToCode()`, `SerializeFile(path)`.
 
-For standalone use:
-```bash
-dotnet publish -c Release -r win-x64 --self-contained
-```
+- **Nodes**: Strongly-typed (`NodeClass`, `NodeMethod`).
+  - `ReadSignature()`, `WriteSignature(sig)`.
+  - `GetMethods()`, `MemberNames`.
 
-The tool includes isolated loading of CSharpier to avoid Roslyn version conflicts, making it robust for deployment across different .NET environments.
+- **Matchers**: `CompareWithKeyResult`, `ListDiff`.
+
+## 🧪 Testing & Validation
+
+- **Compile**: `CompileWithDotNetBuild(projectPath)`.
+- **Self-Merge Test**: `TestSelfMerge()`.
+- **Tree Health**: `CheckTree()`.
 
 ## 🤝 Contributing
 
-Contributions are welcome! This is a sophisticated code manipulation engine — please:
+1. Fork & PR.
+2. Add tests (e.g., new `Workflow`).
+3. Run `dotnet format`.
+4. Ensure `dotnet build` succeeds.
 
-1. Discuss major changes via GitHub Issues first
-2. Maintain the high standard of semantic correctness
-3. Add or update self-tests when extending functionality
-4. Ensure all transformations pass compilation tests
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Issues: [New Issue](https://github.com/yourusername/Evolver5/issues/new)
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License. See [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
-- **Roslyn Team** at Microsoft for the incredible compiler platform
-- **CSharpier** for excellent code formatting
-- The broader .NET community for inspiration in code generation tools
-- All contributors who have helped evolve this codebase using itself
+- [Roslyn](https://github.com/dotnet/roslyn): Syntax inspiration.
+- [CSharpier](https://csharpier.com/): Formatting.
+- [YamlDotNet](https://github.com/aaubry/YamlDotNet): YAML.
+- Grok API: README generation (self-referential!).
 
 ---
 
-
-Need help or have a refactoring challenge? Open an issue on the [GitHub repository](https://github.com/terrycode27/csharp-evolver).
+⭐ **Star if useful!** Questions? Open an issue.
 ```
-
