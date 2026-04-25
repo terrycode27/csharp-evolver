@@ -1,4 +1,3 @@
-```markdown
 # Evolver5
 
 [![Build](https://github.com/yourusername/Evolver5/actions/workflows/build.yml/badge.svg)](https://github.com/yourusername/Evolver5/actions)
@@ -177,4 +176,3 @@ MIT License. See [LICENSE](LICENSE) for details.
 ---
 
 ⭐ **Star if useful!** Questions? Open an issue.
-```
