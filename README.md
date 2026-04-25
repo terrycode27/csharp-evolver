@@ -1,6 +1,6 @@
 # Evolver5
 
-[![Build](https://github.com/yourusername/Evolver5/actions/workflows/build.yml/badge.svg)](https://github.com/yourusername/Evolver5/actions)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Evolver5 is a powerful C# source code analysis, transformation, and evolution framework. It uses a custom semantic AST (Abstract Syntax Tree) to parse, manipulate, refactor, and generate C# code with high precision. Designed for large-scale codebases, it supports merging duplicates, extracting partial classes, generating documentation, dependency analysis, and more—all while ensuring compilability via integrated checks.
@@ -160,7 +160,6 @@ di.MergeCodeDirectoryTo("Evolver5_Consolidated.cs");
 3. Run `dotnet format`.
 4. Ensure `dotnet build` succeeds.
 
-Issues: [New Issue](https://github.com/yourusername/Evolver5/issues/new)
 
 ## 📄 License
 
