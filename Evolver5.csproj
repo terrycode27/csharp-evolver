@@ -13,7 +13,7 @@
     <!-- === IMPORTANT: Packaging settings === -->
     <IsPackable>true</IsPackable>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <Version>1.2.16</Version>                    <!-- Update this when you want a new release -->
+    <Version>1.2.17</Version>                    <!-- Update this when you want a new release -->
     <PackageId>Evolver5</PackageId>
     <Authors>terrycode27</Authors>
     <Description>C# Evolver</Description>
